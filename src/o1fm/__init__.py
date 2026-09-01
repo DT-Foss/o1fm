@@ -10,6 +10,7 @@ from .attention import (
     revin,
     sinkhorn_transport,
 )
+from .action_bank import ActionBank, ActionProfileKey, ActionReceipt
 from .contracts import (
     ForecastExample,
     ForecastInputs,
@@ -18,7 +19,10 @@ from .contracts import (
     ForecastTarget,
     ForecastTargets,
 )
+from .crystals import ForecastCrystalBank, ForecastCrystalKey
+from .identity import CanonicalIdentity, canonical_json_bytes, sha256_json
 from .losses import forecast_loss, monotone_penalty, pinball_loss
+from .o1 import O1Config, O1State
 from .model import ForecastBatch, ForecastResult, O1FMConfig, O1FMForecaster
 from .synthetic import (
     SyntheticConfig,
@@ -28,11 +32,17 @@ from .synthetic import (
 )
 
 __all__ = [
+    "ActionBank",
+    "ActionProfileKey",
+    "ActionReceipt",
     "CrossVariateSinkhornAttention",
+    "CanonicalIdentity",
     "ForecastBatch",
     "ForecastBlock",
     "ForecastExample",
     "ForecastInputs",
+    "ForecastCrystalBank",
+    "ForecastCrystalKey",
     "ForecastOutput",
     "ForecastPrediction",
     "ForecastResult",
@@ -40,6 +50,8 @@ __all__ = [
     "ForecastTargets",
     "O1FMConfig",
     "O1FMForecaster",
+    "O1Config",
+    "O1State",
     "RMSNorm",
     "SwiGLU",
     "SyntheticConfig",
@@ -52,5 +64,7 @@ __all__ = [
     "patchify",
     "pinball_loss",
     "revin",
+    "canonical_json_bytes",
+    "sha256_json",
     "sinkhorn_transport",
 ]
