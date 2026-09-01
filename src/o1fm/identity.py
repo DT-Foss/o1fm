@@ -8,16 +8,14 @@ identity, state seal, or revision hash.
 
 from __future__ import annotations
 
-from collections.abc import Mapping, Sequence
-from dataclasses import dataclass
 import hashlib
 import json
 import math
 import re
-from types import MappingProxyType
-from typing import Any
 import unicodedata
-
+from collections.abc import Mapping, Sequence
+from dataclasses import dataclass
+from types import MappingProxyType
 
 IDENTITY_SCHEMA = "o1fm.canonical-identity/v1"
 MAX_CANONICAL_BYTES = 16 * 1024 * 1024
@@ -96,9 +94,7 @@ def _normalize(value: object) -> object:
                 visit(child, depth=depth + 1, path=f"{path}[{index}]")
                 for index, child in enumerate(item)
             ]
-        raise IdentityError(
-            f"{path} contains unsupported value {type(item).__name__}"
-        )
+        raise IdentityError(f"{path} contains unsupported value {type(item).__name__}")
 
     return visit(value, depth=0, path="value")
 
@@ -150,9 +146,10 @@ class CanonicalIdentity:
     components: Mapping[str, object]
 
     def __post_init__(self) -> None:
-        if not isinstance(self.namespace, str) or _NAMESPACE.fullmatch(
-            self.namespace
-        ) is None:
+        if (
+            not isinstance(self.namespace, str)
+            or _NAMESPACE.fullmatch(self.namespace) is None
+        ):
             raise IdentityError("identity namespace is not canonical")
         normalized = _normalize(self.components)
         if not isinstance(normalized, dict) or not normalized:

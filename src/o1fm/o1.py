@@ -2,19 +2,19 @@
 
 from __future__ import annotations
 
-from collections.abc import Iterator, Mapping, Sequence
-from contextlib import contextmanager
-from dataclasses import dataclass
 import json
 import math
 import os
-from pathlib import Path
 import re
 import secrets
 import stat
 import threading
-from typing import Any
 import unicodedata
+from collections.abc import Iterator, Mapping
+from contextlib import contextmanager
+from dataclasses import dataclass
+from pathlib import Path
+from typing import Any
 
 import numpy as np
 
@@ -200,13 +200,10 @@ class O1Config:
         try:
             result = cls(
                 quantiles=tuple(
-                    _from_hex(item, field="quantile")
-                    for item in value["quantiles"]
+                    _from_hex(item, field="quantile") for item in value["quantiles"]
                 ),
                 ew_decay=_from_hex(value["ew_decay"], field="ew_decay"),
-                cusum_decay=_from_hex(
-                    value["cusum_decay"], field="cusum_decay"
-                ),
+                cusum_decay=_from_hex(value["cusum_decay"], field="cusum_decay"),
                 cusum_drift=_from_hex(
                     value["cusum_drift"],
                     field="cusum_drift",
@@ -217,9 +214,7 @@ class O1Config:
                     field="cusum_threshold",
                     nonnegative=True,
                 ),
-                epsilon=_from_hex(
-                    value["epsilon"], field="epsilon", nonnegative=True
-                ),
+                epsilon=_from_hex(value["epsilon"], field="epsilon", nonnegative=True),
             )
         except (TypeError, ValueError) as exc:
             raise O1IntegrityError("O1 config values are invalid") from exc
@@ -419,9 +414,7 @@ class O1State:
             raise O1IntegrityError("event state must not contain its circular head")
         pinball_sums = value.get("pinball_sums")
         pinball_counts = value.get("pinball_counts")
-        if not isinstance(pinball_sums, list) or not isinstance(
-            pinball_counts, list
-        ):
+        if not isinstance(pinball_sums, list) or not isinstance(pinball_counts, list):
             raise O1IntegrityError("O1 pinball fields are invalid")
         try:
             return cls(
@@ -524,9 +517,7 @@ class O1Update:
             "batch_mae": self.batch_mae.hex(),
             "cusum": self.cusum.hex(),
             "interval_coverage": (
-                None
-                if self.interval_coverage is None
-                else self.interval_coverage.hex()
+                None if self.interval_coverage is None else self.interval_coverage.hex()
             ),
             "learning_progress": self.learning_progress.hex(),
             "normalized_error": self.normalized_error.hex(),
@@ -556,8 +547,10 @@ class O1Update:
             "sequence",
             "surprise",
         }
-        if not isinstance(value, Mapping) or set(value) != fields or not isinstance(
-            value.get("pinball"), Mapping
+        if (
+            not isinstance(value, Mapping)
+            or set(value) != fields
+            or not isinstance(value.get("pinball"), Mapping)
         ):
             raise O1IntegrityError("O1 update fields are invalid")
         coverage = value["interval_coverage"]
@@ -888,10 +881,7 @@ class O1ErrorStream:
             persisted.identity_sha256 != self.identity_sha256
             or len(persisted.pinball_sums) != len(self.config.quantiles)
             or persisted.sequence > event_state.sequence
-            or (
-                persisted.sequence == event_state.sequence
-                and persisted != event_state
-            )
+            or (persisted.sequence == event_state.sequence and persisted != event_state)
         ):
             raise O1IntegrityError("O1 state differs from its event history")
         self._state = event_state
@@ -988,7 +978,10 @@ class O1ErrorStream:
             observed = np.ones(actual_array.shape, dtype=np.bool_)
         else:
             observed = np.asarray(mask)
-            if observed.dtype != np.dtype(np.bool_) or observed.shape != actual_array.shape:
+            if (
+                observed.dtype != np.dtype(np.bool_)
+                or observed.shape != actual_array.shape
+            ):
                 raise ValueError("mask must be boolean with the forecast shape")
         if not bool(observed.any()):
             raise ValueError("at least one realized value must be observed")
@@ -1005,9 +998,7 @@ class O1ErrorStream:
             if not isinstance(quantile_forecasts, Mapping):
                 raise TypeError("quantile_forecasts must be a mapping")
             for raw_level, raw_forecast in quantile_forecasts.items():
-                level = _probability(
-                    raw_level, field="quantile", open_interval=True
-                )
+                level = _probability(raw_level, field="quantile", open_interval=True)
                 if level not in self.config.quantiles:
                     raise ValueError("quantile is outside the configured inventory")
                 try:
@@ -1058,8 +1049,10 @@ class O1ErrorStream:
             ordered = sorted(quantile_arrays)
             lower_array = quantile_arrays[ordered[0]]
             upper_array = quantile_arrays[ordered[-1]]
-        if lower_array is not None and upper_array is not None and bool(
-            (lower_array[observed] > upper_array[observed]).any()
+        if (
+            lower_array is not None
+            and upper_array is not None
+            and bool((lower_array[observed] > upper_array[observed]).any())
         ):
             raise ValueError("lower interval exceeds upper interval")
 
@@ -1184,9 +1177,7 @@ class O1ErrorStream:
                 identity_sha256=self.identity_sha256,
                 sequence=_checked_add(state.sequence, 1, field="sequence"),
                 head_event_sha256=state.head_event_sha256,
-                observations=_checked_add(
-                    state.observations, 1, field="observations"
-                ),
+                observations=_checked_add(state.observations, 1, field="observations"),
                 value_count=_checked_add(state.value_count, count, field="value_count"),
                 absolute_error_sum=state.absolute_error_sum + float(absolute.sum()),
                 signed_error_sum=state.signed_error_sum + float(residual.sum()),
@@ -1252,8 +1243,7 @@ class O1ErrorStream:
                     level.hex(): (
                         None
                         if state.pinball_counts[index] == 0
-                        else state.pinball_sums[index]
-                        / state.pinball_counts[index]
+                        else state.pinball_sums[index] / state.pinball_counts[index]
                     )
                     for index, level in enumerate(self.config.quantiles)
                 },
