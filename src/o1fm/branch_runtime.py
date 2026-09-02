@@ -26,7 +26,7 @@ from .branches import (
 from .causal_graph import CausalEdge
 from .contracts import ForecastInputs, ForecastPrediction
 from .identity import canonical_json_bytes, sha256_json
-from .teachers import ForecastTeacher
+from .teachers import ForecastTeacher, ForecastTeacherCapabilities
 
 _MAX_TEXT_BYTES = 1024
 
@@ -184,6 +184,9 @@ class TeacherBranchRuntime:
     ) -> None:
         if not isinstance(teacher, ForecastTeacher):
             raise TypeError("teacher must implement ForecastTeacher")
+        capabilities = getattr(teacher, "capabilities", None)
+        if not isinstance(capabilities, ForecastTeacherCapabilities):
+            raise TypeError("teacher.capabilities must be ForecastTeacherCapabilities")
         if not isinstance(provenance, TeacherBranchProvenance) and not callable(
             provenance
         ):
@@ -191,6 +194,7 @@ class TeacherBranchRuntime:
                 "provenance must be TeacherBranchProvenance or a callable provider"
             )
         self.teacher = teacher
+        self.capabilities = capabilities
         self._provenance = provenance
         self.model_identity = _teacher_model_identity(teacher)
         self._executor = BranchExecutor(
@@ -242,8 +246,15 @@ class TeacherBranchRuntime:
         plans: Sequence[InterventionPlan] = (),
     ) -> BranchSet:
         """Execute the factual path plus each canonical intervention plan."""
-
-        return self._executor.execute(inputs, plans)
+        if isinstance(plans, (str, bytes)) or not isinstance(plans, Sequence):
+            raise TypeError("plans must be a sequence")
+        selected = tuple(plans)
+        if selected and not self.capabilities.known_future_covariates:
+            raise ValueError(
+                "teacher does not support exogenous known-future covariates; "
+                "intervention branches are unavailable"
+            )
+        return self._executor.execute(inputs, selected)
 
 
 __all__ = [

@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import numpy as np
 import pytest
+import torch
 
 from o1fm.atlas import AtlasReceipt
 from o1fm.branch_runtime import TeacherBranchProvenance, TeacherBranchRuntime
@@ -13,6 +14,13 @@ from o1fm.branches import (
 )
 from o1fm.causal_graph import CausalEdge
 from o1fm.contracts import ForecastInputs, ForecastPrediction
+from o1fm.model import DEFAULT_QUANTILES
+from o1fm.teachers import (
+    Chronos2Teacher,
+    ForecastTeacherCapabilities,
+    NativeO1FMTeacher,
+    Toto2Teacher,
+)
 
 
 def _inputs() -> ForecastInputs:
@@ -92,6 +100,7 @@ def _plan(
 class _DeterministicTeacher:
     quantile_levels = (0.1, 0.5, 0.9)
     identity = "teacher-model-v1"
+    capabilities = ForecastTeacherCapabilities(True, True, True, True)
 
     def __init__(self, *, mutate_private_copy: bool = False) -> None:
         self.calls: list[ForecastInputs] = []
@@ -287,3 +296,98 @@ def test_runtime_fallback_model_identity_is_deterministic() -> None:
     second = TeacherBranchRuntime(TeacherWithoutIdentity(), provenance)
     assert first.model_identity == second.model_identity
     assert len(first.model_identity) == 64
+
+
+def test_toto_capability_rejects_intervention_before_any_forward() -> None:
+    class FakeToto:
+        def __init__(self) -> None:
+            self.calls = 0
+
+        def forecast(
+            self,
+            payload: dict[str, torch.Tensor],
+            horizon: int,
+            **_: object,
+        ) -> torch.Tensor:
+            self.calls += 1
+            variates = payload["target"].shape[1]
+            result = torch.empty(
+                (len(DEFAULT_QUANTILES), 1, variates, horizon),
+                dtype=torch.float32,
+            )
+            for index in range(len(DEFAULT_QUANTILES)):
+                result[index].fill_(float(index))
+            return result
+
+    inputs = _inputs()
+    model = FakeToto()
+    provenance = TeacherBranchProvenance(
+        action_identity="foundation",
+        profile_identity="profile-v1",
+        route_identity="route-v1",
+        graph_identity="graph-v1",
+        atlas_citations=(_receipt(),),
+    )
+    runtime = TeacherBranchRuntime(Toto2Teacher(model), provenance)
+    plan = _plan(inputs, name="unsupported", covariate=0, value=9.0)
+    with pytest.raises(ValueError, match="does not support exogenous known-future"):
+        runtime.execute(inputs, (plan,))
+    assert model.calls == 0
+
+    factual = runtime.execute(inputs)
+    assert len(factual.branches) == 1
+    assert factual.factual.is_factual
+    assert model.calls == 1
+
+
+@pytest.mark.parametrize(
+    "capabilities",
+    (NativeO1FMTeacher.capabilities, Chronos2Teacher.capabilities),
+)
+def test_known_future_capable_teachers_execute_intervention_branches(
+    capabilities: ForecastTeacherCapabilities,
+) -> None:
+    class CapableTeacher(_DeterministicTeacher):
+        pass
+
+    CapableTeacher.capabilities = capabilities
+    inputs = _inputs()
+    teacher = CapableTeacher()
+    provenance = TeacherBranchProvenance(
+        action_identity="foundation",
+        profile_identity="profile-v1",
+        route_identity="route-v1",
+        graph_identity="graph-v1",
+        atlas_citations=(_receipt(),),
+        route_edges=(_edge(),),
+    )
+    runtime = TeacherBranchRuntime(
+        teacher,
+        provenance,
+        known_covariate_names=("price", "promotion"),
+        target_names=("demand",),
+    )
+    branches = runtime.execute(
+        inputs,
+        (_plan(inputs, name="supported", covariate=0, value=10.0),),
+    )
+    assert len(branches.branches) == 2
+    assert len(teacher.calls) == 2
+
+
+def test_branch_runtime_requires_explicit_capabilities() -> None:
+    class InferenceOnly:
+        quantile_levels = (0.1, 0.5, 0.9)
+
+        def predict(self, inputs: ForecastInputs) -> ForecastPrediction:
+            return _DeterministicTeacher().predict(inputs)
+
+    provenance = TeacherBranchProvenance(
+        action_identity="foundation",
+        profile_identity="profile-v1",
+        route_identity="route-v1",
+        graph_identity="graph-v1",
+        atlas_citations=(_receipt(),),
+    )
+    with pytest.raises(TypeError, match="teacher.capabilities"):
+        TeacherBranchRuntime(InferenceOnly(), provenance)

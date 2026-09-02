@@ -9,6 +9,7 @@ from __future__ import annotations
 
 import importlib
 from collections.abc import Sequence
+from dataclasses import dataclass
 from typing import Protocol, runtime_checkable
 
 import numpy as np
@@ -21,8 +22,55 @@ from .training import model_identity
 from .training import predict as native_predict
 
 _NATIVE_ADAPTER = "o1fm.native/v1"
-_TOTO2_ADAPTER = "o1fm.toto2/v1"
+_TOTO2_ADAPTER = "o1fm.toto2/v2"
 _CHRONOS2_ADAPTER = "o1fm.chronos2/v1"
+
+
+@dataclass(frozen=True, slots=True)
+class ForecastTeacherCapabilities:
+    """Machine-readable features an inference adapter actually consumes."""
+
+    multiple_targets: bool
+    past_covariates: bool
+    known_future_covariates: bool
+    quantiles: bool
+
+    def __post_init__(self) -> None:
+        for field in (
+            "multiple_targets",
+            "past_covariates",
+            "known_future_covariates",
+            "quantiles",
+        ):
+            if not isinstance(getattr(self, field), bool):
+                raise TypeError(f"{field} must be boolean")
+
+    def to_record(self) -> dict[str, object]:
+        return {
+            "known_future_covariates": self.known_future_covariates,
+            "multiple_targets": self.multiple_targets,
+            "past_covariates": self.past_covariates,
+            "quantiles": self.quantiles,
+            "schema": "o1fm.forecast-teacher-capabilities/v1",
+        }
+
+    @property
+    def sha256(self) -> str:
+        return sha256_json(self.to_record())
+
+
+_FULL_CAPABILITIES = ForecastTeacherCapabilities(
+    multiple_targets=True,
+    past_covariates=True,
+    known_future_covariates=True,
+    quantiles=True,
+)
+_TOTO2_CAPABILITIES = ForecastTeacherCapabilities(
+    multiple_targets=True,
+    past_covariates=True,
+    known_future_covariates=False,
+    quantiles=True,
+)
 
 
 def _levels(value: Sequence[float]) -> tuple[float, ...]:
@@ -126,6 +174,7 @@ class NativeO1FMTeacher:
     """Use an ``O1FMForecaster`` through the same teacher protocol."""
 
     adapter = _NATIVE_ADAPTER
+    capabilities = _FULL_CAPABILITIES
 
     def __init__(
         self,
@@ -152,9 +201,10 @@ class NativeO1FMTeacher:
 
 
 class Toto2Teacher:
-    """Adapter for Datadog Toto-2's tensor forecasting API."""
+    """Adapter for Toto-2.0 without unsupported future-exogenous claims."""
 
     adapter = _TOTO2_ADAPTER
+    capabilities = _TOTO2_CAPABILITIES
 
     def __init__(
         self,
@@ -200,14 +250,17 @@ class Toto2Teacher:
         return teacher_identity(self.adapter, self.checkpoint, self.quantile_levels)
 
     def _payload(self, inputs: ForecastInputs) -> dict[str, torch.Tensor]:
-        historical = np.concatenate(
-            (inputs.past_target, inputs.past_covariates), axis=1
-        )
-        historical_mask = np.concatenate(
-            (inputs.past_target_mask, inputs.past_covariate_mask), axis=1
-        )
+        historical_parts = [inputs.past_target, inputs.past_covariates]
+        historical_masks = [inputs.past_target_mask, inputs.past_covariate_mask]
+        if inputs.known_covariate_dim:
+            historical_parts.append(inputs.known_covariates[: inputs.history_length])
+            historical_masks.append(
+                inputs.known_covariate_mask[: inputs.history_length]
+            )
+        historical = np.concatenate(historical_parts, axis=1)
+        historical_mask = np.concatenate(historical_masks, axis=1)
         variates = historical.shape[1]
-        payload = {
+        return {
             "target": torch.as_tensor(
                 np.array(historical.T, copy=True),
                 dtype=torch.float32,
@@ -222,27 +275,6 @@ class Toto2Teacher:
                 (1, variates), dtype=torch.long, device=self.device
             ),
         }
-        if inputs.known_covariate_dim:
-            payload.update(
-                {
-                    "known_dynamic": torch.as_tensor(
-                        np.array(inputs.known_covariates.T, copy=True),
-                        dtype=torch.float32,
-                        device=self.device,
-                    ).unsqueeze(0),
-                    "known_dynamic_mask": torch.as_tensor(
-                        np.array(inputs.known_covariate_mask.T, copy=True),
-                        dtype=torch.bool,
-                        device=self.device,
-                    ).unsqueeze(0),
-                    "known_dynamic_series_ids": torch.zeros(
-                        (1, inputs.known_covariate_dim),
-                        dtype=torch.long,
-                        device=self.device,
-                    ),
-                }
-            )
-        return payload
 
     def predict(self, inputs: ForecastInputs) -> ForecastPrediction:
         if not isinstance(inputs, ForecastInputs):
@@ -253,7 +285,7 @@ class Toto2Teacher:
             for mask in (
                 inputs.past_target_mask,
                 inputs.past_covariate_mask,
-                inputs.known_covariate_mask,
+                inputs.known_covariate_mask[: inputs.history_length],
             )
         )
         with torch.no_grad():
@@ -268,7 +300,7 @@ class Toto2Teacher:
         expected = (
             len(self.quantile_levels),
             1,
-            inputs.target_dim + inputs.past_covariate_dim,
+            inputs.target_dim + inputs.past_covariate_dim + inputs.known_covariate_dim,
             inputs.horizon,
         )
         if array.shape != expected:
@@ -436,6 +468,7 @@ class Chronos2Teacher:
     """Adapter for Amazon Chronos-2's multivariate list-of-dicts API."""
 
     adapter = _CHRONOS2_ADAPTER
+    capabilities = _FULL_CAPABILITIES
 
     def __init__(
         self,
@@ -514,6 +547,7 @@ class Chronos2Teacher:
 __all__ = [
     "Chronos2Teacher",
     "ForecastTeacher",
+    "ForecastTeacherCapabilities",
     "NativeO1FMTeacher",
     "Toto2Teacher",
     "teacher_identity",

@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import importlib
+from dataclasses import FrozenInstanceError
 from types import SimpleNamespace
 
 import numpy as np
@@ -13,6 +14,7 @@ from o1fm.open_teacher_demo import _module_sha256
 from o1fm.teachers import (
     Chronos2Teacher,
     ForecastTeacher,
+    ForecastTeacherCapabilities,
     NativeO1FMTeacher,
     Toto2Teacher,
     teacher_identity,
@@ -89,27 +91,102 @@ def test_toto_maps_masks_covariates_and_quantiles() -> None:
     payload, horizon, kwargs = model.call
     assert horizon == 3
     assert kwargs == {"decode_block_size": None, "has_missing_values": True}
-    assert payload["target"].shape == (1, 3, 4)
+    assert payload["target"].shape == (1, 4, 4)
     np.testing.assert_array_equal(
         payload["target"][0].cpu().numpy(),
-        np.concatenate((inputs.past_target, inputs.past_covariates), axis=1).T,
+        np.concatenate(
+            (
+                inputs.past_target,
+                inputs.past_covariates,
+                inputs.known_covariates[: inputs.history_length],
+            ),
+            axis=1,
+        ).T,
     )
     np.testing.assert_array_equal(
         payload["target_mask"][0].cpu().numpy(),
-        np.concatenate((inputs.past_target_mask, inputs.past_covariate_mask), axis=1).T,
+        np.concatenate(
+            (
+                inputs.past_target_mask,
+                inputs.past_covariate_mask,
+                inputs.known_covariate_mask[: inputs.history_length],
+            ),
+            axis=1,
+        ).T,
     )
-    assert payload["series_ids"].tolist() == [[0, 0, 0]]
-    assert payload["known_dynamic"].shape == (1, 1, 7)
-    np.testing.assert_array_equal(
-        payload["known_dynamic_mask"][0, 0].cpu().numpy(),
-        inputs.known_covariate_mask[:, 0],
-    )
-    assert payload["known_dynamic_series_ids"].tolist() == [[0]]
+    assert payload["series_ids"].tolist() == [[0, 0, 0, 0]]
+    assert not any(key.startswith("known_dynamic") for key in payload)
     assert prediction.quantiles is not None
     assert prediction.quantiles.shape == (3, 2, 9)
     np.testing.assert_allclose(prediction.point, prediction.quantiles[..., 4])
     assert not prediction.point.flags.writeable
     assert not prediction.quantiles.flags.writeable
+
+
+def test_toto_ignores_future_schedule_instead_of_claiming_exogenous_support() -> None:
+    base = _inputs()
+    inputs = ForecastInputs(
+        series_id=base.series_id,
+        horizon=base.horizon,
+        timestamps=base.timestamps,
+        past_target=base.past_target,
+        past_covariates=base.past_covariates,
+        known_covariates=base.known_covariates,
+    )
+    changed_known = np.array(inputs.known_covariates, copy=True)
+    changed_known[inputs.history_length :, 0] += 1000.0
+    changed_mask = np.array(inputs.known_covariate_mask, copy=True)
+    changed_mask[inputs.history_length :] = ~changed_mask[inputs.history_length :]
+    changed = ForecastInputs(
+        series_id=inputs.series_id,
+        horizon=inputs.horizon,
+        timestamps=inputs.timestamps,
+        past_target=inputs.past_target,
+        past_target_mask=inputs.past_target_mask,
+        past_covariates=inputs.past_covariates,
+        past_covariate_mask=inputs.past_covariate_mask,
+        known_covariates=changed_known,
+        known_covariate_mask=changed_mask,
+    )
+    factual_model = _FakeToto()
+    changed_model = _FakeToto()
+    factual = Toto2Teacher(factual_model).predict(inputs)
+    counterfactual = Toto2Teacher(changed_model).predict(changed)
+    assert factual_model.call is not None and changed_model.call is not None
+    factual_payload, _, factual_kwargs = factual_model.call
+    changed_payload, _, changed_kwargs = changed_model.call
+    assert factual_payload.keys() == changed_payload.keys()
+    for key in factual_payload:
+        torch.testing.assert_close(factual_payload[key], changed_payload[key])
+    assert factual_kwargs == changed_kwargs
+    assert factual_kwargs["has_missing_values"] is False
+    np.testing.assert_array_equal(factual.point, counterfactual.point)
+    np.testing.assert_array_equal(factual.quantiles, counterfactual.quantiles)
+
+
+def test_teacher_capabilities_are_strict_immutable_and_machine_readable() -> None:
+    full = ForecastTeacherCapabilities(True, True, True, True)
+    assert full.to_record() == {
+        "known_future_covariates": True,
+        "multiple_targets": True,
+        "past_covariates": True,
+        "quantiles": True,
+        "schema": "o1fm.forecast-teacher-capabilities/v1",
+    }
+    assert len(full.sha256) == 64
+    with pytest.raises(FrozenInstanceError):
+        full.known_future_covariates = False  # type: ignore[misc]
+    with pytest.raises(TypeError, match="must be boolean"):
+        ForecastTeacherCapabilities(True, True, 1, True)  # type: ignore[arg-type]
+
+    assert NativeO1FMTeacher.capabilities == full
+    assert Chronos2Teacher.capabilities == full
+    assert Toto2Teacher.capabilities == ForecastTeacherCapabilities(
+        multiple_targets=True,
+        past_covariates=True,
+        known_future_covariates=False,
+        quantiles=True,
+    )
 
 
 def test_toto_rejects_crossed_or_wrong_shaped_output() -> None:
