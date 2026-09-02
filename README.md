@@ -14,10 +14,10 @@ multivariate history + known future covariates
           O1 regime and error state
                     │
        Action Bank chooses forecast work
-          ┌─────────┼──────────┐
-     Crystal    structural    foundation
-      kernel      baseline       model
-          └─────────┼──────────┘
+       ┌────────┬────────┬──────────┐
+    Crystal   local FM  structural  foundation
+     kernel   authority   baseline     model
+       └────────┴────────┴──────────┘
                     │
        directed O1 conformal field
                     │
@@ -85,7 +85,7 @@ evidence.
 | Marginal 10–90% coverage | 57.64% | **79.40%** |
 | Joint whole-trajectory coverage | 0/12 | **10/12** |
 | Mean interval width | 0.6432 | 1.1640 |
-| Mean pinball loss | 0.12314 | **0.12261** |
+| Mean pinball loss | 0.12316 | **0.12263** |
 | Foundation forwards | 6/12 | **6/12** |
 
 The field recovered 21.76 coverage points, finished 0.60 points from the 80%
@@ -95,38 +95,43 @@ atomic action/route/regime state are all in the live runtime.
 
 The committed receipt is
 [`results/o1fm-directed-conformal-v1.json`](results/o1fm-directed-conformal-v1.json),
-SHA-256 `b0f62cc3b7a5de5c4494bd9099496bebfe73def2bc621b66ff5bc94335e59c8e`.
+SHA-256 `0897e004f8cd6f23181ab7868343c74f51d18b397139a10fbe20a49b4369bac6`.
 
 An independent `--no-conformal` control reproduced the same six-foundation /
-six-Crystal action trace, 57.64% coverage and 0.12314 pinball. Its committed
+six-Crystal action trace, 57.64% coverage and 0.12316 pinball. Its committed
 receipt is
 [`results/o1fm-no-conformal-control-v1.json`](results/o1fm-no-conformal-control-v1.json),
-SHA-256 `97c9f70831c83d8c006dd009ca1a53cdd3a309c1e68517683da06657b33904bb`.
+SHA-256 `6b8a7884ef3bf35c1b7e8e67f5f560695e9a81eb31512ba29072e0675efaebe2`.
 
 ## Real open-weight teacher result
 
-O1FM now runs unchanged over real Toto-2.0 weights through the common
-`ForecastTeacher` contract. The receipt pins the loaded 21,915,584-parameter
-checkpoint by its tensor SHA-256 and executes 24 non-overlapping multivariate
-windows with past-only and known-future covariates.
+O1FM now runs a real Apache-2.0 Toto family through the common
+`ForecastTeacher` contract: 22M is the foundation authority and 4M is the
+continuous local authority. The receipt pins both loaded checkpoints by tensor
+SHA-256 and executes 24 non-overlapping multivariate windows with past-only and
+known-future covariates.
 
 | Metric | Raw Toto-22M | Calibrated all-Toto control | Adaptive O1FM |
 |---|---:|---:|---:|
-| Toto forwards | 24 | 24 | **15** |
-| Verified structural executions | 0 | 0 | **9** |
-| Marginal coverage | 82.37% | 86.92% | **85.74%** |
+| Toto-22M forwards | 24 | 24 | **7** |
+| Toto-4M forwards | 0 | 0 | 24 |
+| Selected local actions | 0 | 0 | **17** |
+| 22M-equivalent forwards | 24 | 24 | **11.54** |
+| Marginal coverage | 82.37% | 86.92% | **87.72%** |
 | Joint trajectory coverage | 12.5% | 87.5% | **87.5%** |
-| MAE | 0.14920 | 0.14920 | 0.15933 |
-| Mean pinball | 0.06026 | 0.06471 | 0.06789 |
+| MAE | 0.14920 | 0.14920 | 0.15235 |
+| Mean pinball | 0.06026 | 0.06471 | 0.06656 |
 
-With an ActionBank pinball tolerance of `0.005`, the control plane removes
-37.5% of Toto forwards. Against the identically calibrated all-Toto control,
-the adaptive policy changes pinball by `+0.00318`, coverage by `-1.17`
-percentage points and MAE by `+0.01014`. The joint envelope remains unchanged.
-The 22M teacher itself averages 12.3 ms per direct 3-target × 16-horizon
-forecast on the recorded arm64 CPU environment.
-The strict gate selects nine seasonal actions and zero ridge Crystals; contextual
-teacher-state compilation is the next Crystal upgrade.
+With an ActionBank pinball tolerance of `0.005` and a foundation refresh every
+four local actions, the control plane removes 70.83% of 22M forwards. Counting
+every 4M shadow/local forward at its parameter ratio still removes 51.92% of
+foundation-equivalent work. Against the identically calibrated all-22M control,
+pinball changes by `+0.00185`, coverage by `+0.81` percentage points and MAE by
+`+0.00315`; the joint envelope is unchanged. Raw 22M and 4M forecasts average
+13.6 ms and 5.4 ms respectively on the recorded arm64 CPU environment.
+
+The strict gate selects 17 local-model actions and zero ridge Crystals.
+Contextual local-teacher states are the next Crystal input upgrade.
 
 The causal graph now appends each rolling history as one validated batch. It
 reloads and fsyncs once per forecast instead of once per timestamp, removing the
@@ -134,9 +139,10 @@ dominant control-plane latency without changing event hashes or graph edges.
 
 The committed receipt is
 [`results/o1fm-toto22m-control-plane-v1.json`](results/o1fm-toto22m-control-plane-v1.json),
-SHA-256 `8a3547628d338f391a0884bc75942e67374a2ee675e6b573545dddfaf6daad7f`.
-The loaded Toto tensors hash to
-`18b094801c589af0e6c9f900bf7f868541ce975712be9ac4a06d4529b647e4b2`.
+SHA-256 `b30fc3eec35e6f76b54adf2df66d239f4a5937494cab570fb75ab9fa2b5498a3`.
+The loaded 22M and 4M tensors hash to
+`18b094801c589af0e6c9f900bf7f868541ce975712be9ac4a06d4529b647e4b2`
+and `41700039ffc479dbc93e79b69ca34adfb7343d15ad170a987537b7c72164508d`.
 
 ## Relationship to TimesFM
 

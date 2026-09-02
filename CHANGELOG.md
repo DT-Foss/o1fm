@@ -26,9 +26,14 @@
   Forecast Crystals, MAE 0.3411 → 0.2788, pinball 0.1335 → 0.1231.
 - Added lazy native/Toto-2/Chronos-2 teacher adapters and removed the runtime's
   hard dependency on the native PyTorch forecaster.
-- Added a real Toto-2.0-22M control-plane receipt pinned to the loaded tensor
-  hash: 9 of 24 teacher forwards replaced under a 0.005 pinball gate, with
-  85.74% marginal and 87.5% joint coverage.
+- Added a real Toto-2.0 multiscale receipt pinned to both loaded tensor hashes:
+  4M local authority plus periodic 22M refreshes remove 70.83% of large-model
+  forwards and 51.92% of parameter-equivalent work while improving coverage.
+- Added `local` as a priced ActionBank action and periodic foundation refreshes
+  that bound local streaks and renew authority under shift.
+- Implemented the exact Foss causal-transport identity and stack geodesic check,
+  then wired normalized per-target route `W1` into Crystal features and result
+  receipts without fragmenting topology identities.
 - Batched causal-graph history append into one reload and directory sync per
   forecast while preserving byte-identical event revisions and graph edges.
 - Added explicit Crystal fitting modes: native O1FM learns realized local

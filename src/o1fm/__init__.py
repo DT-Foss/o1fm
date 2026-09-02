@@ -53,6 +53,14 @@ from .teachers import (
     teacher_identity,
 )
 from .training import model_identity, predict, tensorize_inputs, train_forecaster
+from .transport import (
+    CausalTransportResult,
+    CausalTransportStackResult,
+    RouteTransportResult,
+    causal_transport_stack,
+    causal_transport_w1,
+    route_transport_w1,
+)
 
 __version__ = "0.1.0"
 
@@ -63,6 +71,8 @@ __all__ = [
     "CanonicalIdentity",
     "CausalEdge",
     "CausalGraphConfig",
+    "CausalTransportResult",
+    "CausalTransportStackResult",
     "ConformalApplication",
     "ConformalConflictError",
     "ConformalFieldConfig",
@@ -97,6 +107,7 @@ __all__ = [
     "O1State",
     "OnlineCausalGraph",
     "RMSNorm",
+    "RouteTransportResult",
     "SeasonalNaiveForecaster",
     "SwiGLU",
     "SyntheticConfig",
@@ -105,6 +116,8 @@ __all__ = [
     "TemporalSelfAttention",
     "Toto2Teacher",
     "canonical_json_bytes",
+    "causal_transport_stack",
+    "causal_transport_w1",
     "extract_features",
     "feature_schema",
     "forecast_loss",
@@ -115,6 +128,7 @@ __all__ = [
     "pinball_loss",
     "predict",
     "revin",
+    "route_transport_w1",
     "run_open_teacher_demo",
     "score_prediction",
     "sha256_json",

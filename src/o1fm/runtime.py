@@ -26,6 +26,7 @@ from .metrics import ForecastScore, score_prediction, verify_prediction
 from .model import O1FMForecaster
 from .o1 import O1ErrorStream, O1Update
 from .teachers import ForecastTeacher, NativeO1FMTeacher
+from .transport import route_transport_w1
 
 
 @dataclass(frozen=True, slots=True)
@@ -34,6 +35,7 @@ class RouteSelection:
     known_indices: tuple[int, ...]
     signature_sha256: str
     edges: tuple[CausalEdge, ...]
+    transport_w1: float = 0.0
 
 
 @dataclass(slots=True)
@@ -55,10 +57,14 @@ class ForecastTicket:
     crystal_key: ForecastCrystalKey
     features: np.ndarray
     latency_seconds: float
+    forward_cost: float
     foundation_forwards: int
+    local_forwards: int
+    forced_foundation_refresh: bool
     route: RouteSelection
     regime: str
     candidates: Mapping[str, tuple[ForecastPrediction, float]]
+    candidate_forward_costs: Mapping[str, float]
 
 
 @dataclass(frozen=True, slots=True)
@@ -71,7 +77,10 @@ class ForecastSettlement:
     calibration_update: ConformalUpdate | None
     joint_covered: bool | None
     crystal_ready: bool
+    forward_cost: float
     foundation_forwards: int
+    local_forwards: int
+    forced_foundation_refresh: bool
     saved_foundation_forwards: int
 
 
@@ -104,6 +113,9 @@ class O1FMRuntime:
         actions: ActionBank,
         conformal: O1ConformalField | None = None,
         compile_teacher_crystals: bool | None = None,
+        local_teacher: ForecastTeacher | None = None,
+        local_forward_cost: float = 0.25,
+        foundation_refresh_interval: int | None = 8,
         seasonal_period: int = 24,
         route_top_k: int = 8,
         route_stability: int = 3,
@@ -137,6 +149,25 @@ class O1FMRuntime:
             compile_teacher_crystals, bool
         ):
             raise TypeError("compile_teacher_crystals must be boolean or None")
+        if local_teacher is not None and not isinstance(local_teacher, ForecastTeacher):
+            raise TypeError("local_teacher must be ForecastTeacher or None")
+        if (
+            isinstance(local_forward_cost, bool)
+            or not isinstance(local_forward_cost, (int, float))
+            or not math.isfinite(float(local_forward_cost))
+            or float(local_forward_cost) < 0.0
+        ):
+            raise ValueError("local_forward_cost must be finite and non-negative")
+        if local_teacher is not None and tuple(local_teacher.quantile_levels) != tuple(
+            teacher.quantile_levels
+        ):
+            raise ValueError("local and foundation quantile inventories must match")
+        if foundation_refresh_interval is not None and (
+            isinstance(foundation_refresh_interval, bool)
+            or not isinstance(foundation_refresh_interval, int)
+            or foundation_refresh_interval <= 0
+        ):
+            raise ValueError("foundation_refresh_interval must be positive or None")
         self.model = model
         self.teacher = teacher
         self.model_identity = model_identity
@@ -150,6 +181,9 @@ class O1FMRuntime:
             if compile_teacher_crystals is None
             else compile_teacher_crystals
         )
+        self.local_teacher = local_teacher
+        self.local_forward_cost = float(local_forward_cost)
+        self.foundation_refresh_interval = foundation_refresh_interval
         self.seasonal = SeasonalNaiveForecaster(
             period=seasonal_period,
             quantile_levels=crystals.quantile_levels,
@@ -160,6 +194,7 @@ class O1FMRuntime:
         self.enable_seasonal = enable_seasonal
         self.device = device
         self._sequence = 0
+        self._nonfoundation_streak = 0
         self._routes_by_regime: dict[str, _RouteState] = {}
 
     @staticmethod
@@ -257,7 +292,11 @@ class O1FMRuntime:
                 "schema": "o1fm.routed-feature-topology/v1",
             }
         )
-        return RouteSelection(past, known, signature, ordered)
+        transport = route_transport_w1(
+            ordered,
+            tuple(self._target_name(index) for index in range(inputs.target_dim)),
+        )
+        return RouteSelection(past, known, signature, ordered, transport.mean_w1)
 
     def _route(self, inputs: ForecastInputs, *, regime: str) -> RouteSelection:
         self._observe_graph_history(inputs)
@@ -318,18 +357,28 @@ class O1FMRuntime:
             raise TypeError("inputs must be ForecastInputs")
         regime = f"regime:{self.o1.state.regime_generation}"
         route = self._route(inputs, regime=regime)
-        schema = feature_schema(
+        base_schema = feature_schema(
             inputs,
             selected_past=route.past_indices,
             selected_known=route.known_indices,
             seasonal_period=self.seasonal_period,
         )
-        features = extract_features(
+        schema = sha256_json(
+            {
+                "base_feature_schema": base_schema,
+                "route_transport": "o1fm.normalized-route-w1/v1",
+            }
+        )
+        base_features = extract_features(
             inputs,
             selected_past=route.past_indices,
             selected_known=route.known_indices,
             seasonal_period=self.seasonal_period,
         )
+        features = np.concatenate(
+            (base_features, np.asarray([route.transport_w1], dtype=np.float64))
+        )
+        features.setflags(write=False)
         crystal_key = ForecastCrystalKey(
             model_identity=self.model_identity,
             feature_schema=schema,
@@ -341,6 +390,21 @@ class O1FMRuntime:
         profile = ActionProfileKey(**crystal_key.to_document())
         candidates: dict[str, tuple[ForecastPrediction, float]] = {}
         candidate_calibrations: dict[str, ConformalApplication] = {}
+        candidate_forward_costs: dict[str, float] = {}
+
+        if self.local_teacher is not None:
+            started = time.perf_counter()
+            local_base = self.local_teacher.predict(inputs)
+            local_calibration = self._calibrate(profile, "local", local_base)
+            local = (
+                local_base
+                if local_calibration is None
+                else local_calibration.prediction
+            )
+            candidates["local"] = (local, time.perf_counter() - started)
+            candidate_forward_costs["local"] = self.local_forward_cost
+            if local_calibration is not None:
+                candidate_calibrations["local"] = local_calibration
 
         if self.enable_seasonal:
             started = time.perf_counter()
@@ -356,6 +420,7 @@ class O1FMRuntime:
                 else seasonal_calibration.prediction
             )
             candidates["seasonal"] = (seasonal, time.perf_counter() - started)
+            candidate_forward_costs["seasonal"] = 0.0
             if seasonal_calibration is not None:
                 candidate_calibrations["seasonal"] = seasonal_calibration
 
@@ -376,17 +441,26 @@ class O1FMRuntime:
                 ),
                 time.perf_counter() - started,
             )
+            candidate_forward_costs["crystal"] = 0.0
             if crystal_calibration is not None:
                 candidate_calibrations["crystal"] = crystal_calibration
 
         recommendation = self.actions.recommend(profile)
         action = recommendation.action
+        forced_foundation_refresh = bool(
+            action != "foundation"
+            and self.foundation_refresh_interval is not None
+            and self._nonfoundation_streak >= self.foundation_refresh_interval
+        )
+        if forced_foundation_refresh:
+            action = "foundation"
         if action in candidates:
             prediction, latency = candidates[action]
             calibration = candidate_calibrations.get(action)
             base_prediction = (
                 prediction if calibration is None else calibration.base_prediction
             )
+            forward_cost = candidate_forward_costs[action]
             forwards = 0
         else:
             action = "foundation"
@@ -401,7 +475,12 @@ class O1FMRuntime:
                 base_prediction if calibration is None else calibration.prediction
             )
             latency = time.perf_counter() - started
+            forward_cost = 1.0
             forwards = 1
+        if action == "foundation":
+            self._nonfoundation_streak = 0
+        else:
+            self._nonfoundation_streak += 1
         prediction.validate_for(inputs)
         verify_prediction(prediction)
         self._sequence += 1
@@ -425,10 +504,14 @@ class O1FMRuntime:
             crystal_key=crystal_key,
             features=features,
             latency_seconds=latency,
+            forward_cost=forward_cost,
             foundation_forwards=forwards,
+            local_forwards=int(self.local_teacher is not None),
+            forced_foundation_refresh=forced_foundation_refresh,
             route=route,
             regime=regime,
             candidates=candidates,
+            candidate_forward_costs=candidate_forward_costs,
         )
 
     def _settle_graph(self, ticket: ForecastTicket, target: ForecastTarget) -> None:
@@ -514,7 +597,7 @@ class O1FMRuntime:
             action: str,
             prediction: ForecastPrediction,
             latency: float,
-            forwards: int,
+            forward_cost: float,
         ) -> None:
             candidate_score = score_prediction(prediction, target)
             candidate_coverage = (
@@ -529,7 +612,7 @@ class O1FMRuntime:
                     quality=candidate_score.quality,
                     coverage=candidate_coverage,
                     latency_seconds=latency,
-                    forward_cost=float(forwards),
+                    forward_cost=forward_cost,
                 )
             )
             settled_actions.add(action)
@@ -538,11 +621,16 @@ class O1FMRuntime:
             ticket.action,
             ticket.prediction,
             ticket.latency_seconds,
-            ticket.foundation_forwards,
+            ticket.forward_cost,
         )
         for action, (prediction, latency) in ticket.candidates.items():
             if action not in settled_actions:
-                settle_action(action, prediction, latency, 0)
+                settle_action(
+                    action,
+                    prediction,
+                    latency,
+                    ticket.candidate_forward_costs[action],
+                )
         return ForecastSettlement(
             ticket_id=ticket.ticket_id,
             action=ticket.action,
@@ -554,7 +642,10 @@ class O1FMRuntime:
                 None if calibration_update is None else calibration_update.joint_hit
             ),
             crystal_ready=False if crystal_stats is None else crystal_stats.ready,
+            forward_cost=ticket.forward_cost,
             foundation_forwards=ticket.foundation_forwards,
+            local_forwards=ticket.local_forwards,
+            forced_foundation_refresh=ticket.forced_foundation_refresh,
             saved_foundation_forwards=int(ticket.action != "foundation"),
         )
 

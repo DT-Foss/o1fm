@@ -157,6 +157,25 @@ def test_action_bank_validates_receipts() -> None:
             latency_seconds=0.1,
             forward_cost=0.0,
         )
+
+
+def test_action_bank_prices_verified_local_teacher(tmp_path: Path) -> None:
+    bank = ActionBank(
+        tmp_path / "actions.json",
+        quality_tolerance=0.01,
+        coverage_tolerance=0.02,
+        min_support=1,
+        latency_cost_weight=0.0,
+        forward_cost_weight=1.0,
+    )
+    profile = _profile()
+    bank.settle(ActionReceipt(profile, "foundation", 0.10, 0.80, 0.02, 1.0))
+    bank.settle(ActionReceipt(profile, "local", 0.105, 0.81, 0.01, 0.2))
+
+    recommendation = bank.recommend(profile)
+    assert recommendation.action == "local"
+    assert recommendation.chosen is not None
+    assert recommendation.chosen.mean_forward_cost == 0.2
     with pytest.raises(ValueError):
         ActionReceipt(
             profile,

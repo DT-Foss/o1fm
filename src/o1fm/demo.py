@@ -183,6 +183,7 @@ def run_demo(
         base_joint = []
         joint_coverage = []
         action_trace = []
+        route_transport = []
         foundation_forwards = 0
         saved_forwards = 0
         runtime_started = time.perf_counter()
@@ -190,6 +191,7 @@ def run_demo(
             ticket = runtime.forecast(example.inputs)
             settlement = runtime.settle(ticket, example.require_target())
             action_trace.append(ticket.action)
+            route_transport.append(ticket.route.transport_w1)
             selected_mae.append(settlement.score.mae)
             selected_pinball.append(
                 settlement.score.mae
@@ -285,7 +287,11 @@ def run_demo(
             "forward_reduction": saved_forwards / max(1, baseline_forwards),
             "saved_foundation_forwards": saved_forwards,
         },
-        "graph": graph_metrics,
+        "graph": {
+            **graph_metrics,
+            "route_transport_w1_max": max(route_transport, default=0.0),
+            "route_transport_w1_mean": _mean(route_transport),
+        },
         "calibration": {
             "direct_foundation_joint_coverage": _mean(direct_joint),
             "direct_foundation_marginal_coverage": direct_coverage_mean,

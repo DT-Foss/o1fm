@@ -183,6 +183,8 @@ def test_route_identity_contains_edge_topology(tmp_path: Path) -> None:
     second = runtime._route_candidate(_inputs())
 
     assert first.past_indices == second.past_indices == (0,)
+    assert first.transport_w1 == 1.0
+    assert second.transport_w1 == 2.0
     assert first.signature_sha256 != second.signature_sha256
 
 
@@ -312,3 +314,82 @@ def test_runtime_accepts_external_forecast_teacher(tmp_path: Path) -> None:
     assert runtime.compile_teacher_crystals is True
     assert ticket.action == "foundation"
     assert settlement.score.mae == 0.0
+
+
+def test_runtime_routes_to_verified_local_teacher_and_prices_its_forward(
+    tmp_path: Path,
+) -> None:
+    foundation = InjectedTeacher()
+    local = InjectedTeacher()
+    runtime = O1FMRuntime(
+        foundation,
+        model_identity="c" * 64,
+        o1=O1ErrorStream(tmp_path / "o1-local.json", stream_id="series-a"),
+        graph=OnlineCausalGraph(tmp_path / "graph-local", graph_id="series-a"),
+        crystals=ForecastCrystalBank(
+            tmp_path / "crystals-local.json",
+            quantile_levels=foundation.quantile_levels,
+        ),
+        actions=ActionBank(
+            tmp_path / "actions-local.json",
+            min_support=1,
+            latency_cost_weight=0.0,
+            forward_cost_weight=1.0,
+        ),
+        local_teacher=local,
+        local_forward_cost=0.2,
+        enable_seasonal=False,
+    )
+    actions = []
+    settlements = []
+    for _ in range(2):
+        ticket = runtime.forecast(_inputs())
+        actions.append(ticket.action)
+        settlements.append(runtime.settle(ticket, _target(_inputs())))
+
+    assert actions == ["foundation", "local"]
+    assert settlements[0].local_forwards == 1
+    assert settlements[1].local_forwards == 1
+    assert settlements[1].foundation_forwards == 0
+    assert settlements[1].forward_cost == 0.2
+
+
+def test_runtime_forces_periodic_foundation_refresh(tmp_path: Path) -> None:
+    foundation = InjectedTeacher()
+    runtime = O1FMRuntime(
+        foundation,
+        model_identity="d" * 64,
+        o1=O1ErrorStream(tmp_path / "o1-refresh.json", stream_id="series-a"),
+        graph=OnlineCausalGraph(tmp_path / "graph-refresh", graph_id="series-a"),
+        crystals=ForecastCrystalBank(
+            tmp_path / "crystals-refresh.json",
+            quantile_levels=foundation.quantile_levels,
+        ),
+        actions=ActionBank(
+            tmp_path / "actions-refresh.json",
+            min_support=1,
+            latency_cost_weight=0.0,
+            forward_cost_weight=1.0,
+        ),
+        local_teacher=InjectedTeacher(),
+        local_forward_cost=0.2,
+        foundation_refresh_interval=1,
+        enable_seasonal=False,
+    )
+    tickets = []
+    settlements = []
+    for _ in range(3):
+        ticket = runtime.forecast(_inputs())
+        tickets.append(ticket)
+        settlements.append(runtime.settle(ticket, _target(_inputs())))
+
+    assert [ticket.action for ticket in tickets] == [
+        "foundation",
+        "local",
+        "foundation",
+    ]
+    assert [item.forced_foundation_refresh for item in settlements] == [
+        False,
+        False,
+        True,
+    ]

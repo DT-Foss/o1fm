@@ -20,6 +20,7 @@ ForecastBatch
   -> O1State.regime
   -> ActionBank.recommend
        -> ForecastCrystal.predict       # zero foundation forwards
+       -> LocalTeacher.predict          # small priced authority
        -> StructuralBaseline.predict    # zero foundation forwards
        -> ForecastTeacher.predict       # novelty authority
   -> DirectedConformalField.apply       # prior settlements only
@@ -50,6 +51,10 @@ Toto-2 maps targets and past-only covariates into historical variates and maps
 known-future channels through its dynamic-covariate input. Chronos-2 receives the
 same roles through its official list-of-dictionaries API. Everything after the
 teacher call—Conformal Field, O1, Graph, Crystals and ActionBank—is shared.
+An optional local teacher is evaluated as a priced candidate. ActionBank can
+select it only after profile-local quality and coverage settlement. A bounded
+local streak forces a foundation refresh, renewing authority, calibration and
+compiler evidence under drift.
 
 ## Directed conformal control
 
@@ -142,6 +147,13 @@ three consecutive candidate observations; an O1 regime change starts a fresh
 route state immediately. The exact `(source, target, lag, kind)` tuples form the
 graph identity used by Crystals and Action profiles. This keeps routing online
 without fragmenting stored compute on one-window score jitter.
+
+For each target, positive routed edge scores are normalized into an explicit
+causal transport distribution over lags. Its exact backward `W1` cost is the
+score-weighted expected lag; intervention edges carry lag zero. The uniform
+mean across targets is appended to the Crystal feature vector but not to the
+topology identity, so live transport strength changes without fragmenting the
+profile. Raw correlations themselves are never mislabeled as transport mass.
 
 Rolling windows are appended through `observe_many()`. The complete batch is
 validated before mutation, the persistent event chain is loaded once, and the

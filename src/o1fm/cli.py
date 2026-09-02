@@ -32,8 +32,12 @@ def build_parser() -> argparse.ArgumentParser:
     )
     teacher.add_argument("--teacher", choices=("toto2", "chronos2"), default="toto2")
     teacher.add_argument("--checkpoint")
+    teacher.add_argument("--local-checkpoint")
+    teacher.add_argument("--no-local", action="store_true")
     teacher.add_argument("--device", default="cpu")
     teacher.add_argument("--seed", type=int, default=23)
+    teacher.add_argument("--quality-tolerance", type=float, default=0.005)
+    teacher.add_argument("--coverage-tolerance", type=float, default=0.05)
     teacher.add_argument("--state-dir")
     teacher.add_argument("--output", help="optional JSON result path")
     return parser
@@ -52,8 +56,12 @@ def main(argv: Sequence[str] | None = None) -> int:
         result = run_open_teacher_demo(
             teacher_name=args.teacher,
             checkpoint=args.checkpoint,
+            local_checkpoint=args.local_checkpoint,
+            enable_local_teacher=not args.no_local,
             device=args.device,
             seed=args.seed,
+            quality_tolerance=args.quality_tolerance,
+            coverage_tolerance=args.coverage_tolerance,
             state_dir=args.state_dir,
         )
     else:  # pragma: no cover - argparse owns commands.

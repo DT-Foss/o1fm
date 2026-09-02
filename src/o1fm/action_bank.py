@@ -12,7 +12,7 @@ from tempfile import NamedTemporaryFile
 from types import MappingProxyType
 
 _SCHEMA = "o1fm.action-bank/v1"
-_ACTIONS = ("foundation", "crystal", "seasonal")
+_ACTIONS = ("foundation", "local", "crystal", "seasonal")
 _MAX_TEXT_BYTES = 1024
 
 
@@ -169,7 +169,7 @@ class ActionReceipt:
             raise TypeError("profile must be ActionProfileKey")
         action = _canonical_text(self.action, field="action")
         if action not in _ACTIONS:
-            raise ValueError("action must be foundation, crystal, or seasonal")
+            raise ValueError("action must be foundation, local, crystal, or seasonal")
         coverage = _finite_float(self.coverage, field="coverage", minimum=0.0)
         if coverage > 1.0:
             raise ValueError("coverage must not exceed 1")
@@ -213,7 +213,7 @@ class ActionStats:
     def __post_init__(self) -> None:
         action = _canonical_text(self.action, field="action")
         if action not in _ACTIONS:
-            raise ValueError("action must be foundation, crystal, or seasonal")
+            raise ValueError("action must be foundation, local, crystal, or seasonal")
         object.__setattr__(self, "action", action)
         object.__setattr__(
             self,
@@ -270,7 +270,7 @@ class ActionRecommendation:
             raise TypeError("profile must be ActionProfileKey")
         action = _canonical_text(self.action, field="action")
         if action not in _ACTIONS:
-            raise ValueError("action must be foundation, crystal, or seasonal")
+            raise ValueError("action must be foundation, local, crystal, or seasonal")
         object.__setattr__(self, "action", action)
         object.__setattr__(self, "reason", _canonical_text(self.reason, field="reason"))
         if self.baseline is not None and not isinstance(self.baseline, ActionStats):
@@ -465,7 +465,9 @@ class ActionBank:
             key=lambda stats: (
                 stats.mean_total_cost,
                 stats.mean_quality,
-                {"foundation": 0, "seasonal": 1, "crystal": 2}[stats.action],
+                {"foundation": 0, "local": 1, "seasonal": 2, "crystal": 3}[
+                    stats.action
+                ],
             ),
         )
         reason = (

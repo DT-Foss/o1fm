@@ -69,9 +69,11 @@ the live state enters that region.
 O1FM owns the control plane. External foundation models are optional teachers,
 not the architecture.
 
-- **Toto 2.0 22M** is the primary compact trajectory teacher. Its Apache-2.0
+- **Toto 2.0 22M** is the foundation trajectory authority. Its Apache-2.0
   checkpoint is 84 MB, emits nine quantiles and alternates causal temporal with
-  full variate attention. [Official model card](https://huggingface.co/Datadog/Toto-2.0-22m)
+  full variate attention. **Toto 2.0 4M** is the continuous local authority;
+  O1FM periodically refreshes it against 22M.
+  [Official model family](https://huggingface.co/Datadog/Toto-2.0-22m)
 - **Chronos-2 120M** is the covariate teacher. It is Apache-2.0 and natively
   supports multivariate targets, past-only covariates and known-future
   covariates. [Official model card](https://huggingface.co/amazon/chronos-2)
@@ -152,6 +154,12 @@ stack these distances add without cancellation. O1FM can therefore attach risk,
 memory and compute reserves to a causal path with an exactly compositional
 transport budget.
 
+This primitive is now executable. O1FM independently evaluates coupling cost
+and discrete CDF-`W1`, enforces stack additivity, constructs normalized
+per-target route transports, and feeds the live mean route distance into every
+Crystal profile. The native receipt measures mean route `W1 = 1.9201`; the real
+Toto receipt measures `2.0580` with a maximum of `2.1591`.
+
 ### Directed state needs more than one scalar
 
 The scalar Möbius no-go classifies every state-independent positive multiplier
@@ -196,10 +204,12 @@ changes under intervention, and which future computation has already been paid.
 
 ## First open-teacher execution
 
-The Toto-2.0-22M adapter has now completed the full loop with actual Apache-2.0
-weights. Across 24 windows, ActionBank replaced nine teacher calls under a
-`0.005` pinball tolerance. The adaptive path retained 85.74% marginal and 87.5%
-joint coverage; the all-teacher calibrated control measured 86.92% and 87.5%.
-The result pins all 21,915,584 loaded parameters by SHA-256. No ridge Crystal
-passed this strict gate, which fixes the next compiler task: replace summary-only
-Crystal inputs with contextual teacher states and causal path features.
+The Toto-2.0 family has now completed the full loop with actual Apache-2.0
+weights. Toto-4M runs as continuous local authority; Toto-22M refreshes authority
+after at most four local actions. Across 24 windows this removes 17 large-model
+calls (70.83%) and 51.92% of parameter-equivalent forward work. Marginal
+coverage rises from the all-22M control's 86.92% to 87.72%, joint coverage stays
+at 87.5%, and pinball changes by only 0.00185. Both checkpoints are pinned by
+their loaded tensor hashes. No ridge Crystal passed the strict gate, which fixes
+the next compiler task: replace summary-only Crystal inputs with contextual
+local-teacher states and causal path features.

@@ -3,84 +3,89 @@
     "actions": {
       "counts": {
         "crystal": 0,
-        "foundation": 15,
-        "seasonal": 9
+        "foundation": 7,
+        "local": 17,
+        "seasonal": 0
       },
       "trace": [
         "foundation",
         "foundation",
+        "local",
+        "local",
         "foundation",
         "foundation",
+        "local",
+        "local",
+        "local",
+        "local",
         "foundation",
+        "local",
+        "local",
+        "local",
         "foundation",
-        "seasonal",
-        "seasonal",
-        "seasonal",
-        "seasonal",
-        "seasonal",
-        "seasonal",
-        "seasonal",
-        "seasonal",
-        "seasonal",
+        "local",
+        "local",
+        "local",
+        "local",
         "foundation",
-        "foundation",
-        "foundation",
-        "foundation",
-        "foundation",
-        "foundation",
-        "foundation",
-        "foundation",
-        "foundation"
+        "local",
+        "local",
+        "local",
+        "local"
       ]
     },
     "base_quality": {
-      "coverage": 0.806034525216706,
-      "mae": 0.15933495612040247,
-      "mean_width": 0.5240301676094532,
-      "pinball": 0.06452428729351911
+      "coverage": 0.8207649167437557,
+      "mae": 0.15235006618171032,
+      "mean_width": 0.5462470265726248,
+      "pinball": 0.06254991910479929
     },
     "calibrated_quality": {
-      "coverage": 0.8574381895193065,
-      "mae": 0.15933495612040247,
-      "mean_width": 0.8990161567926407,
-      "pinball": 0.0678872646807757
+      "coverage": 0.8772344065851235,
+      "mae": 0.15235006618171032,
+      "mean_width": 0.973500261704127,
+      "pinball": 0.06656238346026823
     },
     "conformal": {
-      "exact_profile_count": 3,
+      "exact_profile_count": 4,
       "joint_coverage": 0.875,
-      "mean_marginal_coverage": 0.857397504456328,
-      "mean_marginal_width_expansion": 0.3730895223286589,
+      "mean_marginal_coverage": 0.8761140819964349,
+      "mean_marginal_width_expansion": 0.42509710415640733,
       "observed_values": 1122,
       "pooled_profile_count": 1,
       "settlements": 24
     },
-    "foundation_forwards": 15,
+    "forced_foundation_refreshes": 2,
+    "foundation_forwards": 7,
     "graph": {
       "edge_count": 72,
       "graph_identity_sha256": "38a088269e36a6672ef11011149753691b998dc414246672f9da4b04d92d4576",
       "head_event_sha256": "a438e334ef7b3014e442363c70e92ede8e9bae96fa26311c73cf4afa28ba799a",
       "last_timestamp_ns": 1705849200000000000,
       "revision": 432,
+      "route_transport_w1_max": 2.1591374339573255,
+      "route_transport_w1_mean": 2.0580454914797826,
       "schema": "o1fm.causal-graph-metrics/v1",
       "supported_edges": 54
     },
     "joint_coverage": 0.875,
+    "local_forwards": 24,
     "o1": {
-      "bias": 0.015416796061350614,
+      "bias": 0.03930966536586676,
       "cusum": 0.0,
-      "ew_absolute_error": 0.22087701043688196,
-      "ew_normalized_error": 0.924554568654424,
-      "head_event_sha256": "cc81125de738e96c099a8d54e3af0041724e9cb834a5907ad20ee06f98a1d21b",
+      "ew_absolute_error": 0.219035193002543,
+      "ew_normalized_error": 0.8818273073944404,
+      "head_event_sha256": "f2fcd926f0f70bd777ab955dfc1362e2ec60c45065d0c0fe61fe5a78c3b3d3f8",
       "identity_sha256": "57207296ab2ed98dbbe59e681fd713ead04695cdac0ceee884685ad70101f247",
-      "interval_coverage": 0.857397504456328,
-      "learning_progress": 0.7193811035018621,
-      "mae": 0.1593099508679193,
-      "mean_interval_width": 0.8967702728879299,
+      "interval_coverage": 0.8761140819964349,
+      "learning_progress": 0.713378241313638,
+      "mae": 0.15242753236918957,
+      "mean_interval_width": 0.9709561716607662,
       "observations": 24,
       "pinball": {
-        "0x1.0000000000000p-1": 0.07965497543395965,
-        "0x1.999999999999ap-4": 0.04947220459049965,
-        "0x1.ccccccccccccdp-1": 0.06410373606542015
+        "0x1.0000000000000p-1": 0.07621376618459479,
+        "0x1.999999999999ap-4": 0.052443174879774686,
+        "0x1.ccccccccccccdp-1": 0.06686099412042355
       },
       "regime_changes": 0,
       "regime_generation": 0,
@@ -89,13 +94,14 @@
       "surprise": 0.0,
       "value_count": 1122
     },
-    "runtime_seconds": 1.562044040998444
+    "runtime_seconds": 1.6266330420039594
   },
   "control": {
     "actions": {
       "counts": {
         "crystal": 0,
         "foundation": 24,
+        "local": 0,
         "seasonal": 0
       },
       "trace": [
@@ -146,6 +152,7 @@
       "pooled_profile_count": 1,
       "settlements": 24
     },
+    "forced_foundation_refreshes": 0,
     "foundation_forwards": 24,
     "graph": {
       "edge_count": 72,
@@ -153,16 +160,19 @@
       "head_event_sha256": "a438e334ef7b3014e442363c70e92ede8e9bae96fa26311c73cf4afa28ba799a",
       "last_timestamp_ns": 1705849200000000000,
       "revision": 432,
+      "route_transport_w1_max": 2.1591374339573255,
+      "route_transport_w1_mean": 2.0580454914797826,
       "schema": "o1fm.causal-graph-metrics/v1",
       "supported_edges": 54
     },
     "joint_coverage": 0.875,
+    "local_forwards": 0,
     "o1": {
       "bias": 0.012018601315672079,
       "cusum": 0.0,
       "ew_absolute_error": 0.21525795266472644,
       "ew_normalized_error": 0.9030194480794129,
-      "head_event_sha256": "6fd6d45bbaf93e07da79dad13ec977ce62bdd2cb87176f839b3ce9519c477881",
+      "head_event_sha256": "8c8d71d31be5a3d8bf9904a818487b52797c0524ff990e2d8eb8ebb03af88c61",
       "identity_sha256": "57207296ab2ed98dbbe59e681fd713ead04695cdac0ceee884685ad70101f247",
       "interval_coverage": 0.8680926916221033,
       "learning_progress": 0.6931680818234114,
@@ -181,7 +191,7 @@
       "surprise": 0.0,
       "value_count": 1122
     },
-    "runtime_seconds": 1.6574282079236582
+    "runtime_seconds": 1.654649999924004
   },
   "data": {
     "history": 64,
@@ -197,9 +207,9 @@
     "targets": 3
   },
   "deltas_vs_calibrated_control": {
-    "coverage": -0.01173783490937752,
-    "mae": 0.010135753383786417,
-    "pinball": 0.0031790965964364343
+    "coverage": 0.008058382156439503,
+    "mae": 0.0031508634450942707,
+    "pinball": 0.001854215375928961
   },
   "direct_raw_teacher": {
     "coverage": 0.8236517434988179,
@@ -207,13 +217,16 @@
     "mae": 0.14919920273661605,
     "mean_width": 0.5059189187983671,
     "pinball": 0.06025731691245043,
-    "seconds": 0.31320025003515184
+    "seconds": 0.333956207963638
   },
   "economics": {
     "baseline_teacher_forwards": 24,
-    "executed_teacher_forwards": 15,
-    "forward_reduction": 0.375,
-    "saved_teacher_forwards": 9
+    "executed_local_forwards": 24,
+    "executed_teacher_forwards": 7,
+    "forward_reduction": 0.7083333333333334,
+    "foundation_equivalent_forwards": 11.538631140288118,
+    "foundation_equivalent_reduction": 0.5192237024879951,
+    "saved_teacher_forwards": 17
   },
   "environment": {
     "device": "cpu",
@@ -222,11 +235,31 @@
     "python": "3.13.1",
     "torch": "2.13.0"
   },
+  "local_raw_teacher": {
+    "coverage": 0.8330974620550246,
+    "joint_coverage": 0.16666666666666666,
+    "mae": 0.1493676063199237,
+    "mean_width": 0.5588710096975168,
+    "pinball": 0.06117428637113428,
+    "seconds": 0.11312654090579599
+  },
+  "local_teacher": {
+    "adapter_identity_sha256": "ce8a51d5bedd7dc76390d1b8c7655d550332d2297ef88a868ec490e6baef0f8c",
+    "checkpoint": "Datadog/Toto-2.0-4m",
+    "forward_cost": 0.1891096308453382,
+    "load_seconds": 3.847544333082624,
+    "parameter_count": 4144448,
+    "weights_sha256": "41700039ffc479dbc93e79b69ca34adfb7343d15ad170a987537b7c72164508d"
+  },
+  "policy": {
+    "coverage_tolerance": 0.05,
+    "quality_tolerance": 0.005
+  },
   "schema": "o1fm.open-teacher-demo/v1",
   "teacher": {
     "adapter_identity_sha256": "282381d4e2e20c3d63009ff8b52271c08d2be8f3f5c1b0971825e06120cec49c",
     "checkpoint": "Datadog/Toto-2.0-22m",
-    "load_seconds": 6.52940433297772,
+    "load_seconds": 19.329183000023477,
     "name": "toto2",
     "package_versions": {
       "chronos-forecasting": null,
