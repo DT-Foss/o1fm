@@ -42,12 +42,31 @@ multivariate history + known future covariates
 - **Hard output contract.** Forecasts must be finite, shape-correct, and
   monotone across quantiles before they can be returned or learned from.
 
-## Status
+## First end-to-end result
 
-The repository is an active proof of concept. The first milestone is a complete
-synthetic multivariate loop: train the compact foundation predictor, stream
-regime changes, settle forecasts against later observations, and measure how
-many full predictor forwards are replaced by verified Crystals.
+The initial proof runs the complete system on a deterministic three-regime
+multivariate stream. It trains on 60 windows, then settles 12 future windows of
+3 targets × 12 horizon steps in temporal order.
+
+| Metric | Direct foundation | O1FM runtime |
+|---|---:|---:|
+| Foundation forwards | 12 | **6** |
+| Forecast Crystal executions | 0 | **6** |
+| MAE | 0.3411 | **0.2788** |
+| Mean pinball loss | 0.1335 | **0.1231** |
+
+The runtime removed 50% of foundation forwards while improving both point and
+probabilistic error on this stream. The live graph accumulated 72 lagged edges,
+55 reached routing support, and O1 settled 432 realized target values. This is
+a synthetic architecture proof, not a claim against public forecasting
+benchmarks. The exact result is produced by:
+
+```bash
+python -m o1fm demo
+```
+
+The committed receipt is [`results/o1fm-demo-v1.json`](results/o1fm-demo-v1.json),
+SHA-256 `8b15f5bf591937b1badb62c523ca07ef37bd9b5c5bbb455a46abe1d0c1d8c7f6`.
 
 ## Relationship to TimesFM
 
@@ -73,6 +92,7 @@ References:
 ```bash
 python -m pip install -e '.[dev]'
 python -m pytest
+python -m o1fm demo
 ```
 
 O1FM is developed by David Tom Foss.

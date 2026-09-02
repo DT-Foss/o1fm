@@ -75,7 +75,9 @@ def test_crystal_bank_observe_predict_and_persist(tmp_path: Path) -> None:
 
     prediction = bank.predict(key, [2.0])
     assert prediction is not None
-    np.testing.assert_allclose(prediction.point, np.array([[5.0], [6.0]], dtype=np.float32), atol=1e-3)
+    np.testing.assert_allclose(
+        prediction.point, np.array([[5.0], [6.0]], dtype=np.float32), atol=1e-3
+    )
     assert list(prediction.quantiles) == [0.1, 0.5, 0.9]
     low = prediction.quantiles[0.1]
     mid = prediction.quantiles[0.5]
@@ -100,8 +102,12 @@ def test_crystal_bank_observe_predict_and_persist(tmp_path: Path) -> None:
     np.testing.assert_allclose(loaded_prediction.point, prediction.point, atol=1e-6)
 
 
-def test_crystal_bank_abstains_on_regime_mismatch_and_unready_profile(tmp_path: Path) -> None:
-    bank = ForecastCrystalBank(tmp_path / "crystals.json", min_support=3, min_sequential_support=1)
+def test_crystal_bank_abstains_on_regime_mismatch_and_unready_profile(
+    tmp_path: Path,
+) -> None:
+    bank = ForecastCrystalBank(
+        tmp_path / "crystals.json", min_support=3, min_sequential_support=1
+    )
     stable = _key("stable")
     bank.observe(stable, [0.0], [[1.0], [2.0]])
     bank.observe(stable, [1.0], [[3.0], [4.0]])

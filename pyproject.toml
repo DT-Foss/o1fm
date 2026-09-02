@@ -1,12 +1,21 @@
 [project]
 name = "o1fm"
 version = "0.1.0"
-description = "Compact multivariate forecasting backbone with O1-style state-aware contracts."
+description = "Continuous causal forecasting with O1 state and stored-compute Crystals."
+readme = "README.md"
+license = "Apache-2.0"
+authors = [{name = "David Tom Foss"}]
 requires-python = ">=3.11"
 dependencies = [
   "numpy>=1.26",
-  "torch",
+  "torch>=2.1",
 ]
+
+[project.scripts]
+o1fm = "o1fm.cli:main"
+
+[project.urls]
+Repository = "https://github.com/DT-Foss/o1fm"
 
 [project.optional-dependencies]
 dev = ["pytest>=8", "ruff>=0.9"]

@@ -40,33 +40,97 @@ def _profile(regime: str = "stable") -> ActionProfileKey:
 
 def test_action_bank_recommends_cheapest_verified_action(tmp_path: Path) -> None:
     path = tmp_path / "action-bank.json"
-    bank = ActionBank(path, quality_tolerance=0.05, coverage_tolerance=0.02, min_support=2)
+    bank = ActionBank(
+        path, quality_tolerance=0.05, coverage_tolerance=0.02, min_support=2
+    )
     profile = _profile()
 
-    bank.settle(ActionReceipt(profile, "foundation", quality=0.50, coverage=0.80, latency_seconds=2.0, forward_cost=4.0))
-    bank.settle(ActionReceipt(profile, "foundation", quality=0.54, coverage=0.82, latency_seconds=2.2, forward_cost=4.1))
-    bank.settle(ActionReceipt(profile, "crystal", quality=0.52, coverage=0.81, latency_seconds=0.1, forward_cost=0.0))
-    bank.settle(ActionReceipt(profile, "crystal", quality=0.53, coverage=0.82, latency_seconds=0.1, forward_cost=0.0))
+    bank.settle(
+        ActionReceipt(
+            profile,
+            "foundation",
+            quality=0.50,
+            coverage=0.80,
+            latency_seconds=2.0,
+            forward_cost=4.0,
+        )
+    )
+    bank.settle(
+        ActionReceipt(
+            profile,
+            "foundation",
+            quality=0.54,
+            coverage=0.82,
+            latency_seconds=2.2,
+            forward_cost=4.1,
+        )
+    )
+    bank.settle(
+        ActionReceipt(
+            profile,
+            "crystal",
+            quality=0.52,
+            coverage=0.81,
+            latency_seconds=0.1,
+            forward_cost=0.0,
+        )
+    )
+    bank.settle(
+        ActionReceipt(
+            profile,
+            "crystal",
+            quality=0.53,
+            coverage=0.82,
+            latency_seconds=0.1,
+            forward_cost=0.0,
+        )
+    )
 
     recommendation = bank.recommend(profile)
     assert recommendation.action == "crystal"
     assert recommendation.reason == "verified-cheapest"
     assert recommendation.baseline is not None
     assert recommendation.chosen is not None
-    assert recommendation.chosen.mean_total_cost < recommendation.baseline.mean_total_cost
+    assert (
+        recommendation.chosen.mean_total_cost < recommendation.baseline.mean_total_cost
+    )
 
     persisted = json.loads(path.read_text(encoding="utf-8"))
     assert persisted["schema"] == "o1fm.action-bank/v1"
 
-    reloaded = ActionBank(path, quality_tolerance=0.05, coverage_tolerance=0.02, min_support=2)
+    reloaded = ActionBank(
+        path, quality_tolerance=0.05, coverage_tolerance=0.02, min_support=2
+    )
     assert reloaded.recommend(profile).action == "crystal"
 
 
-def test_action_bank_falls_back_to_foundation_when_quality_is_worse(tmp_path: Path) -> None:
-    bank = ActionBank(tmp_path / "action-bank.json", quality_tolerance=0.01, min_support=1)
+def test_action_bank_falls_back_to_foundation_when_quality_is_worse(
+    tmp_path: Path,
+) -> None:
+    bank = ActionBank(
+        tmp_path / "action-bank.json", quality_tolerance=0.01, min_support=1
+    )
     profile = _profile()
-    bank.settle(ActionReceipt(profile, "foundation", quality=0.40, coverage=0.90, latency_seconds=1.0, forward_cost=3.0))
-    bank.settle(ActionReceipt(profile, "crystal", quality=0.45, coverage=0.95, latency_seconds=0.1, forward_cost=0.0))
+    bank.settle(
+        ActionReceipt(
+            profile,
+            "foundation",
+            quality=0.40,
+            coverage=0.90,
+            latency_seconds=1.0,
+            forward_cost=3.0,
+        )
+    )
+    bank.settle(
+        ActionReceipt(
+            profile,
+            "crystal",
+            quality=0.45,
+            coverage=0.95,
+            latency_seconds=0.1,
+            forward_cost=0.0,
+        )
+    )
 
     recommendation = bank.recommend(profile)
     assert recommendation.action == "foundation"
@@ -85,6 +149,20 @@ def test_action_bank_unknown_profiles_return_foundation() -> None:
 def test_action_bank_validates_receipts() -> None:
     profile = _profile()
     with pytest.raises(ValueError):
-        ActionReceipt(profile, "invalid", quality=0.1, coverage=0.5, latency_seconds=0.1, forward_cost=0.0)
+        ActionReceipt(
+            profile,
+            "invalid",
+            quality=0.1,
+            coverage=0.5,
+            latency_seconds=0.1,
+            forward_cost=0.0,
+        )
     with pytest.raises(ValueError):
-        ActionReceipt(profile, "foundation", quality=0.1, coverage=1.5, latency_seconds=0.1, forward_cost=0.0)
+        ActionReceipt(
+            profile,
+            "foundation",
+            quality=0.1,
+            coverage=1.5,
+            latency_seconds=0.1,
+            forward_cost=0.0,
+        )

@@ -102,6 +102,11 @@ the strongest stable incoming edges per target and records an append-only graph
 revision. The graph never fabricates causality from a name; every edge is tied
 to settled temporal evidence.
 
+The routed feature topology is fixed for one O1 regime generation. Graph
+moments continue to update underneath it; an O1 regime change reopens routing
+and creates a new Crystal/Action profile. This prevents ordinary score jitter
+from fragmenting stored compute while keeping real regime changes explicit.
+
 ## Forecast Crystals
 
 A Forecast Crystal is a compact local action, not a cached answer. Context is

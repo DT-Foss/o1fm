@@ -29,13 +29,21 @@ def _canonical_text(value: object, *, field: str) -> str:
 
 
 def _positive_int(value: object, *, field: str, maximum: int) -> int:
-    if isinstance(value, bool) or not isinstance(value, int) or not 1 <= value <= maximum:
+    if (
+        isinstance(value, bool)
+        or not isinstance(value, int)
+        or not 1 <= value <= maximum
+    ):
         raise ValueError(f"{field} must be a positive bounded integer")
     return value
 
 
 def _nonnegative_int(value: object, *, field: str, maximum: int) -> int:
-    if isinstance(value, bool) or not isinstance(value, int) or not 0 <= value <= maximum:
+    if (
+        isinstance(value, bool)
+        or not isinstance(value, int)
+        or not 0 <= value <= maximum
+    ):
         raise ValueError(f"{field} must be a non-negative bounded integer")
     return value
 
@@ -166,7 +174,9 @@ class ActionReceipt:
         if coverage > 1.0:
             raise ValueError("coverage must not exceed 1")
         object.__setattr__(self, "action", action)
-        object.__setattr__(self, "quality", _finite_float(self.quality, field="quality"))
+        object.__setattr__(
+            self, "quality", _finite_float(self.quality, field="quality")
+        )
         object.__setattr__(self, "coverage", coverage)
         object.__setattr__(
             self,
@@ -301,8 +311,12 @@ class _ActionState:
             raise ValueError("action bank entry must be a mapping")
         support = _nonnegative_int(value.get("support"), field="support", maximum=10**9)
         quality_sum = _finite_float(value.get("quality_sum"), field="quality_sum")
-        coverage_sum = _finite_float(value.get("coverage_sum"), field="coverage_sum", minimum=0.0)
-        latency_sum = _finite_float(value.get("latency_sum"), field="latency_sum", minimum=0.0)
+        coverage_sum = _finite_float(
+            value.get("coverage_sum"), field="coverage_sum", minimum=0.0
+        )
+        latency_sum = _finite_float(
+            value.get("latency_sum"), field="latency_sum", minimum=0.0
+        )
         forward_cost_sum = _finite_float(
             value.get("forward_cost_sum"),
             field="forward_cost_sum",
@@ -404,7 +418,10 @@ class ActionBank:
             raise TypeError("profile must be ActionProfileKey")
         actions = self._profiles.get(profile, {})
         return MappingProxyType(
-            {action: self._stats_for(action, state) for action, state in actions.items()}
+            {
+                action: self._stats_for(action, state)
+                for action, state in actions.items()
+            }
         )
 
     def recommend(self, profile: ActionProfileKey) -> ActionRecommendation:
@@ -426,7 +443,9 @@ class ActionBank:
                 profile=profile,
                 action="foundation",
                 reason="baseline-unverified",
-                baseline=None if baseline_state is None else self._stats_for("foundation", baseline_state),
+                baseline=None
+                if baseline_state is None
+                else self._stats_for("foundation", baseline_state),
                 chosen=None,
                 eligible_actions=MappingProxyType({}),
             )

@@ -36,13 +36,21 @@ def _canonical_text(value: object, *, field: str) -> str:
 
 
 def _positive_int(value: object, *, field: str, maximum: int) -> int:
-    if isinstance(value, bool) or not isinstance(value, int) or not 1 <= value <= maximum:
+    if (
+        isinstance(value, bool)
+        or not isinstance(value, int)
+        or not 1 <= value <= maximum
+    ):
         raise ValueError(f"{field} must be a positive bounded integer")
     return value
 
 
 def _nonnegative_int(value: object, *, field: str, maximum: int) -> int:
-    if isinstance(value, bool) or not isinstance(value, int) or not 0 <= value <= maximum:
+    if (
+        isinstance(value, bool)
+        or not isinstance(value, int)
+        or not 0 <= value <= maximum
+    ):
         raise ValueError(f"{field} must be a non-negative bounded integer")
     return value
 
@@ -58,7 +66,9 @@ def _finite_float(value: object, *, field: str, minimum: float | None = None) ->
     return result
 
 
-def _readonly_float32(value: NDArray[np.float64], *, shape: tuple[int, ...]) -> NDArray[np.float32]:
+def _readonly_float32(
+    value: NDArray[np.float64], *, shape: tuple[int, ...]
+) -> NDArray[np.float32]:
     array = np.array(value, dtype=np.float32, order="C", copy=True)
     if array.shape != shape or not bool(np.isfinite(array).all()):
         raise ValueError("forecast array could not be canonicalized")
@@ -100,7 +110,9 @@ def _future_matrix(
 def _quantile_levels(value: Sequence[object]) -> tuple[float, ...]:
     if isinstance(value, (str, bytes)) or not isinstance(value, Sequence):
         raise ValueError("quantile_levels must be a sequence")
-    levels = tuple(sorted({_finite_float(level, field="quantile level") for level in value}))
+    levels = tuple(
+        sorted({_finite_float(level, field="quantile level") for level in value})
+    )
     if not levels:
         raise ValueError("quantile_levels must contain at least one level")
     if any(not 0.0 < level < 1.0 for level in levels):
@@ -405,13 +417,21 @@ class _CrystalState:
             maximum=_MAX_FEATURES,
         )
         support = _nonnegative_int(value.get("support"), field="support", maximum=10**9)
-        feature_sum = _feature_vector(value.get("feature_sum"), expected_size=feature_dim)
-        target_sum = _feature_vector(value.get("target_sum"), expected_size=key.output_dim)
+        feature_sum = _feature_vector(
+            value.get("feature_sum"), expected_size=feature_dim
+        )
+        target_sum = _feature_vector(
+            value.get("target_sum"), expected_size=key.output_dim
+        )
         gram = np.array(value.get("gram"), dtype=np.float64, order="C", copy=True)
         cross = np.array(value.get("cross"), dtype=np.float64, order="C", copy=True)
-        if gram.shape != (feature_dim, feature_dim) or not bool(np.isfinite(gram).all()):
+        if gram.shape != (feature_dim, feature_dim) or not bool(
+            np.isfinite(gram).all()
+        ):
             raise ValueError("stored crystal gram is invalid")
-        if cross.shape != (feature_dim, key.output_dim) or not bool(np.isfinite(cross).all()):
+        if cross.shape != (feature_dim, key.output_dim) or not bool(
+            np.isfinite(cross).all()
+        ):
             raise ValueError("stored crystal cross term is invalid")
         residual_rows_raw = value.get("residual_rows")
         if not isinstance(residual_rows_raw, list):
@@ -546,7 +566,11 @@ class ForecastCrystalBank:
         stats = self._stats_for(state)
         if not stats.ready:
             return None
-        levels = self._quantile_levels if quantile_levels is None else _quantile_levels(quantile_levels)
+        levels = (
+            self._quantile_levels
+            if quantile_levels is None
+            else _quantile_levels(quantile_levels)
+        )
         vector = _feature_vector(features, expected_size=state.feature_dim)
         point_flat = self._predict_flat(state, vector)
         quantile_map = self._quantiles_for(state, point_flat, levels)
@@ -609,14 +633,20 @@ class ForecastCrystalBank:
             residual = target_flat - point_before
             state.sequential_support += 1
             state.absolute_error_sum += float(np.abs(residual).sum())
-            quantiles_before = self._quantiles_for(state, point_before, self._quantile_levels)
+            quantiles_before = self._quantiles_for(
+                state, point_before, self._quantile_levels
+            )
             lower = quantiles_before[min(quantiles_before)]
             upper = quantiles_before[max(quantiles_before)]
-            state.covered_values += int(np.count_nonzero((target_flat >= lower) & (target_flat <= upper)))
+            state.covered_values += int(
+                np.count_nonzero((target_flat >= lower) & (target_flat <= upper))
+            )
             state.observed_values += key.output_dim
             state.residual_rows.append([float(item) for item in residual.tolist()])
             if len(state.residual_rows) > self._max_residual_history:
-                del state.residual_rows[: len(state.residual_rows) - self._max_residual_history]
+                del state.residual_rows[
+                    : len(state.residual_rows) - self._max_residual_history
+                ]
 
         state.support += 1
         state.feature_sum = state.feature_sum + vector
@@ -633,15 +663,31 @@ class ForecastCrystalBank:
             raise ValueError("crystal has no support")
         feature_mean = state.feature_sum / count
         target_mean = state.target_sum / count
-        centered_gram = state.gram - np.outer(state.feature_sum, state.feature_sum) / count
-        centered_cross = state.cross - np.outer(state.feature_sum, state.target_sum) / count
-        regularized = centered_gram + (self._ridge * np.eye(state.feature_dim, dtype=np.float64))
+        centered_gram = (
+            state.gram - np.outer(state.feature_sum, state.feature_sum) / count
+        )
+        centered_cross = (
+            state.cross - np.outer(state.feature_sum, state.target_sum) / count
+        )
+        centered_gram = 0.5 * (centered_gram + centered_gram.T)
+        eigenvalues, eigenvectors = np.linalg.eigh(centered_gram)
+        positive = np.maximum(eigenvalues, 0.0)
+        with np.errstate(divide="ignore", over="ignore", invalid="ignore"):
+            centered_gram = (eigenvectors * positive) @ eigenvectors.T
+        scale = max(
+            1.0,
+            float(np.trace(centered_gram)) / max(1, state.feature_dim),
+        )
+        regularized = centered_gram + (
+            self._ridge * scale * np.eye(state.feature_dim, dtype=np.float64)
+        )
         try:
             coefficients = np.linalg.solve(regularized, centered_cross)
         except np.linalg.LinAlgError:
-            coefficients = np.linalg.pinv(regularized) @ centered_cross
-        intercept = target_mean - (feature_mean @ coefficients)
-        point = intercept + (vector @ coefficients)
+            coefficients = np.linalg.pinv(regularized, rcond=1e-10) @ centered_cross
+        with np.errstate(divide="ignore", over="ignore", invalid="ignore"):
+            intercept = target_mean - (feature_mean @ coefficients)
+            point = intercept + (vector @ coefficients)
         if point.shape != (state.key.output_dim,) or not bool(np.isfinite(point).all()):
             raise ValueError("crystal prediction became non-finite")
         return point
