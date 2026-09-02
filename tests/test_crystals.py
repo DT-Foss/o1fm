@@ -123,3 +123,93 @@ def test_crystal_bank_rejects_non_finite_inputs(tmp_path: Path) -> None:
         bank.observe(key, [np.inf], [[1.0], [2.0]])
     with pytest.raises(ValueError):
         bank.observe(key, [0.0], [[np.nan], [2.0]])
+    bank.observe(
+        key,
+        [0.0],
+        [[np.nan], [2.0]],
+        future_target_mask=[[False], [True]],
+    )
+
+
+def test_crystal_bank_partial_mask_uses_zero_then_current_point_imputation(
+    tmp_path: Path,
+) -> None:
+    path = tmp_path / "crystals.json"
+    bank = ForecastCrystalBank(
+        path,
+        ridge=1e-6,
+        min_support=2,
+        min_sequential_support=1,
+        max_mean_absolute_error=10.0,
+        min_coverage=0.0,
+        quantile_levels=(0.1, 0.5, 0.9),
+    )
+    key = _key()
+
+    first = bank.observe(
+        key,
+        [0.0],
+        [[1.0], [999.0]],
+        future_target_mask=[[True], [False]],
+    )
+    assert first.support == 1
+    assert first.sequential_support == 0
+    persisted = json.loads(path.read_text(encoding="utf-8"))
+    assert persisted["entries"][0]["target_sum"] == [1.0, 0.0]
+
+    second = bank.observe(key, [1.0], [[3.0], [4.0]])
+    assert second.support == 2
+    assert second.sequential_support == 1
+    prediction = bank.predict(key, [2.0])
+    assert prediction is not None
+    np.testing.assert_allclose(
+        prediction.point,
+        np.array([[5.0], [8.0]], dtype=np.float32),
+        atol=1e-3,
+    )
+
+    third = bank.observe(
+        key,
+        [2.0],
+        [[5.0], [1234.0]],
+        future_target_mask=[[True], [False]],
+    )
+    assert third.support == 3
+    assert third.sequential_support == 2
+    assert third.residual_support == 2
+    assert third.mean_absolute_error == pytest.approx(2.0)
+    assert third.empirical_coverage == pytest.approx(0.0)
+
+    persisted = json.loads(path.read_text(encoding="utf-8"))
+    entry = persisted["entries"][0]
+    assert entry["target_sum"][0] == pytest.approx(9.0)
+    assert entry["target_sum"][1] == pytest.approx(12.0, abs=2e-5)
+    assert entry["observed_values"] == 3
+    assert entry["covered_values"] == 0
+    assert entry["residual_rows"][-1][0] == pytest.approx(0.0, abs=1e-5)
+    assert entry["residual_rows"][-1][1] == pytest.approx(0.0, abs=1e-9)
+
+    reloaded = ForecastCrystalBank(
+        path,
+        ridge=1e-6,
+        min_support=2,
+        min_sequential_support=1,
+        max_mean_absolute_error=10.0,
+        min_coverage=0.0,
+    )
+    loaded_prediction = reloaded.predict(key, [2.0])
+    assert loaded_prediction is not None
+    assert np.all(loaded_prediction.quantiles[0.1] <= loaded_prediction.quantiles[0.5])
+    assert np.all(loaded_prediction.quantiles[0.5] <= loaded_prediction.quantiles[0.9])
+
+
+def test_crystal_bank_rejects_invalid_future_target_mask(tmp_path: Path) -> None:
+    bank = ForecastCrystalBank(tmp_path / "crystals.json")
+    key = _key()
+    with pytest.raises(ValueError):
+        bank.observe(
+            key,
+            [0.0],
+            [[1.0], [2.0]],
+            future_target_mask=[[True, False]],
+        )

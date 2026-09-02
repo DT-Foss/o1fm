@@ -95,16 +95,40 @@ def _future_matrix(
     *,
     horizon: int,
     target_count: int,
+    mask: object | None,
 ) -> FloatMatrix:
+    raw = np.asarray(value)
     try:
         matrix = np.array(value, dtype=np.float64, order="C", copy=True)
     except (TypeError, ValueError, OverflowError) as exc:
         raise ValueError("future targets must be numeric") from exc
     if matrix.shape != (horizon, target_count):
         raise ValueError("future targets must match [horizon, target_count]")
-    if not bool(np.isfinite(matrix).all()):
-        raise ValueError("future targets must be finite")
+    observed = _future_mask(mask, horizon=horizon, target_count=target_count)
+    if bool((observed & ~np.isfinite(matrix)).any()):
+        raise ValueError("future targets must be finite where observed")
+    matrix[~observed] = 0.0
+    if not bool(np.isfinite(matrix).all()) or raw.shape != matrix.shape:
+        raise ValueError("future targets could not be canonicalized")
     return matrix
+
+
+def _future_mask(
+    value: object | None,
+    *,
+    horizon: int,
+    target_count: int,
+) -> NDArray[np.bool_]:
+    shape = (horizon, target_count)
+    if value is None:
+        mask = np.ones(shape, dtype=np.bool_, order="C")
+    else:
+        raw = np.asarray(value)
+        mask = np.array(value, dtype=np.bool_, order="C", copy=True)
+        if raw.dtype != np.dtype(np.bool_) or mask.shape != shape:
+            raise ValueError("future_target_mask must match [horizon, target_count]")
+    mask.setflags(write=False)
+    return mask
 
 
 def _quantile_levels(value: Sequence[object]) -> tuple[float, ...]:
@@ -381,9 +405,9 @@ class _CrystalState:
         return len(self.residual_rows)
 
     def mean_absolute_error(self) -> float | None:
-        if self.sequential_support == 0:
+        if self.observed_values == 0:
             return None
-        return self.absolute_error_sum / (self.sequential_support * self.key.output_dim)
+        return self.absolute_error_sum / self.observed_values
 
     def empirical_coverage(self) -> float | None:
         if self.observed_values == 0:
@@ -596,6 +620,7 @@ class ForecastCrystalBank:
         features: object,
         future_target: object,
         *,
+        future_target_mask: object | None = None,
         regime: str | None = None,
     ) -> ForecastCrystalStats:
         if not isinstance(key, ForecastCrystalKey):
@@ -625,23 +650,41 @@ class ForecastCrystalBank:
             future_target,
             horizon=key.horizon,
             target_count=key.target_count,
+            mask=future_target_mask,
         )
-        target_flat = future.reshape(key.output_dim)
-
+        observed_mask = _future_mask(
+            future_target_mask,
+            horizon=key.horizon,
+            target_count=key.target_count,
+        )
+        observed_flat = observed_mask.reshape(key.output_dim)
+        observed_count = int(np.count_nonzero(observed_flat))
+        future_flat = future.reshape(key.output_dim)
         if state.support > 0:
             point_before = self._predict_flat(state, vector)
+            target_flat = np.where(observed_flat, future_flat, point_before)
+        else:
+            point_before = np.zeros(key.output_dim, dtype=np.float64)
+            target_flat = np.where(observed_flat, future_flat, 0.0)
+
+        if state.support > 0 and observed_count > 0:
             residual = target_flat - point_before
+            observed_residual = residual[observed_flat]
             state.sequential_support += 1
-            state.absolute_error_sum += float(np.abs(residual).sum())
+            state.absolute_error_sum += float(np.abs(observed_residual).sum())
             quantiles_before = self._quantiles_for(
                 state, point_before, self._quantile_levels
             )
             lower = quantiles_before[min(quantiles_before)]
             upper = quantiles_before[max(quantiles_before)]
             state.covered_values += int(
-                np.count_nonzero((target_flat >= lower) & (target_flat <= upper))
+                np.count_nonzero(
+                    observed_flat
+                    & (target_flat >= lower)
+                    & (target_flat <= upper)
+                )
             )
-            state.observed_values += key.output_dim
+            state.observed_values += observed_count
             state.residual_rows.append([float(item) for item in residual.tolist()])
             if len(state.residual_rows) > self._max_residual_history:
                 del state.residual_rows[
