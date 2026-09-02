@@ -26,6 +26,7 @@ from .identity import sha256_json
 from .metrics import ForecastScore, score_prediction, verify_prediction
 from .model import O1FMForecaster
 from .o1 import O1ErrorStream, O1Update
+from .settlements import SettlementFragment, SettlementLedger
 from .teachers import ForecastTeacher, NativeO1FMTeacher
 from .transport import route_transport_w1
 
@@ -88,6 +89,9 @@ class ForecastSettlement:
     local_forwards: int
     forced_foundation_refresh: bool
     saved_foundation_forwards: int
+    fragment_sha256: str
+    observed_values: int
+    replayed: bool
     atlas_settlement_receipt: AtlasReceipt | None
 
 
@@ -129,6 +133,7 @@ class O1FMRuntime:
         route_stability: int = 3,
         enable_seasonal: bool = True,
         device: str = "cpu",
+        settlements: SettlementLedger | None = None,
     ) -> None:
         teacher: ForecastTeacher
         if isinstance(model, O1FMForecaster):
@@ -178,6 +183,8 @@ class O1FMRuntime:
             raise ValueError("foundation_refresh_interval must be positive or None")
         if atlas is not None and not isinstance(atlas, ForecastAtlas):
             raise TypeError("atlas must be ForecastAtlas or None")
+        if settlements is not None and not isinstance(settlements, SettlementLedger):
+            raise TypeError("settlements must be SettlementLedger or None")
         self.model = model
         self.teacher = teacher
         self.model_identity = model_identity
@@ -195,6 +202,9 @@ class O1FMRuntime:
         self.local_forward_cost = float(local_forward_cost)
         self.foundation_refresh_interval = foundation_refresh_interval
         self.atlas = atlas
+        self.settlements = settlements or SettlementLedger(
+            o1.state_path.with_name(f"{o1.state_path.name}.settlements.json")
+        )
         self.seasonal = SeasonalNaiveForecaster(
             period=seasonal_period,
             quantile_levels=crystals.quantile_levels,
@@ -597,8 +607,27 @@ class O1FMRuntime:
     ) -> ForecastSettlement:
         if not isinstance(ticket, ForecastTicket):
             raise TypeError("ticket must be ForecastTicket")
+        if not isinstance(target, ForecastTarget):
+            raise TypeError("target must be ForecastTarget")
+        # Validate the complete caller-visible request before deriving its delta.
         score = score_prediction(ticket.prediction, target)
         base_score = score_prediction(ticket.base_prediction, target)
+        del score, base_score
+        with self.settlements.transaction():
+            fragment = self.settlements.prepare(ticket.ticket_id, target)
+            settlement = self._settle_fragment(ticket, fragment)
+            self.settlements.commit(fragment)
+            return settlement
+
+    def _settle_fragment(
+        self,
+        ticket: ForecastTicket,
+        fragment: SettlementFragment,
+    ) -> ForecastSettlement:
+        target = fragment.target
+        score = score_prediction(ticket.prediction, target)
+        base_score = score_prediction(ticket.base_prediction, target)
+        observation_id = f"fragment:{fragment.fragment_sha256}"
         quantile_map = {}
         if ticket.prediction.quantiles is not None:
             assert ticket.prediction.quantile_levels is not None
@@ -615,7 +644,7 @@ class O1FMRuntime:
             ticket.prediction.point,
             quantile_forecasts=quantile_map,
             mask=target.mask,
-            observation_id=f"ticket:{ticket.ticket_id}",
+            observation_id=observation_id,
         )
         calibration_update = None
         shadow_calibration_updates: dict[str, ConformalUpdate] = {}
@@ -626,7 +655,7 @@ class O1FMRuntime:
                 target,
                 surprise=update.surprise,
                 cusum=update.cusum,
-                observation_id=f"ticket:{ticket.ticket_id}",
+                observation_id=observation_id,
             )
         if self.conformal is not None:
             for action, candidate_calibration in ticket.candidate_calibrations.items():
@@ -638,7 +667,7 @@ class O1FMRuntime:
                     target,
                     surprise=update.surprise,
                     cusum=update.cusum,
-                    observation_id=(f"ticket:{ticket.ticket_id}:candidate:{action}"),
+                    observation_id=f"{observation_id}:candidate:{action}",
                     update_pool=False,
                 )
         crystal_stats = self.crystals.observe(
@@ -660,6 +689,7 @@ class O1FMRuntime:
                 or ticket.action == "crystal"
             ),
             regime=ticket.regime,
+            observation_id=f"{observation_id}:crystal",
         )
 
         settled_actions: set[str] = set()
@@ -684,7 +714,8 @@ class O1FMRuntime:
                     coverage=candidate_coverage,
                     latency_seconds=latency,
                     forward_cost=forward_cost,
-                )
+                ),
+                settlement_id=f"{observation_id}:action:{action}",
             )
             settled_actions.add(action)
 
@@ -719,6 +750,9 @@ class O1FMRuntime:
             local_forwards=ticket.local_forwards,
             forced_foundation_refresh=ticket.forced_foundation_refresh,
             saved_foundation_forwards=int(ticket.action != "foundation"),
+            fragment_sha256=fragment.fragment_sha256,
+            observed_values=fragment.observed_values,
+            replayed=fragment.replayed or update.duplicate,
             atlas_settlement_receipt=None,
         )
         if self.atlas is not None:

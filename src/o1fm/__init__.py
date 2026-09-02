@@ -1,6 +1,11 @@
 """O1FM: continuous causal forecasting with stored compute."""
 
-from .action_bank import ActionBank, ActionProfileKey, ActionReceipt
+from .action_bank import (
+    ActionBank,
+    ActionBankConflictError,
+    ActionProfileKey,
+    ActionReceipt,
+)
 from .atlas import AtlasReceipt, ForecastAtlas, SegmentStore
 from .attention import (
     CrossVariateSinkhornAttention,
@@ -13,6 +18,39 @@ from .attention import (
     sinkhorn_transport,
 )
 from .baselines import SeasonalNaiveForecaster
+from .branches import (
+    BranchExecutionResult,
+    BranchExecutor,
+    BranchSet,
+    ForecastBranch,
+    IdentificationStatus,
+    InterventionOperation,
+    InterventionPlan,
+    InterventionSpec,
+    JointEnvelope,
+    TargetTrajectory,
+    TrajectoryExtremes,
+    apply_intervention,
+)
+from .branch_runtime import (
+    TeacherBranchProvenance,
+    TeacherBranchProvenanceProvider,
+    TeacherBranchRuntime,
+)
+from .cartography import (
+    BackgroundRun,
+    CartographerBudgets,
+    CartographerConfig,
+    CartographyBudgetError,
+    CartographyError,
+    CartographyIntegrityError,
+    ForecastCartographer,
+    ForecastProbeTarget,
+    ProbeConflictError,
+    ProbeEvidence,
+    ProbePriority,
+    ProbeReceipt,
+)
 from .causal_graph import CausalEdge, CausalGraphConfig, OnlineCausalGraph
 from .conformal import (
     ConformalApplication,
@@ -31,7 +69,11 @@ from .contracts import (
     ForecastTarget,
     ForecastTargets,
 )
-from .crystals import ForecastCrystalBank, ForecastCrystalKey
+from .crystals import (
+    ForecastCrystalBank,
+    ForecastCrystalConflictError,
+    ForecastCrystalKey,
+)
 from .features import FEATURE_ABI, extract_features, feature_schema
 from .identity import CanonicalIdentity, canonical_json_bytes, sha256_json
 from .losses import forecast_loss, monotone_penalty, pinball_loss
@@ -40,6 +82,13 @@ from .model import ForecastBatch, ForecastResult, O1FMConfig, O1FMForecaster
 from .o1 import O1Config, O1ErrorStream, O1State
 from .open_teacher_demo import run_open_teacher_demo
 from .runtime import ForecastSettlement, ForecastTicket, O1FMRuntime
+from .settlements import (
+    SettlementConflictError,
+    SettlementFragment,
+    SettlementIntegrityError,
+    SettlementLedger,
+    SettlementLedgerError,
+)
 from .synthetic import (
     SyntheticConfig,
     SyntheticDataset,
@@ -67,14 +116,24 @@ __version__ = "0.1.0"
 
 __all__ = [
     "ActionBank",
+    "ActionBankConflictError",
     "ActionProfileKey",
     "ActionReceipt",
     "AtlasReceipt",
+    "BackgroundRun",
+    "BranchExecutionResult",
+    "BranchExecutor",
+    "BranchSet",
     "CanonicalIdentity",
     "CausalEdge",
     "CausalGraphConfig",
     "CausalTransportResult",
     "CausalTransportStackResult",
+    "CartographerBudgets",
+    "CartographerConfig",
+    "CartographyBudgetError",
+    "CartographyError",
+    "CartographyIntegrityError",
     "ConformalApplication",
     "ConformalConflictError",
     "ConformalFieldConfig",
@@ -86,13 +145,17 @@ __all__ = [
     "FEATURE_ABI",
     "ForecastBatch",
     "ForecastBlock",
+    "ForecastBranch",
     "ForecastAtlas",
+    "ForecastCartographer",
     "ForecastCrystalBank",
+    "ForecastCrystalConflictError",
     "ForecastCrystalKey",
     "ForecastExample",
     "ForecastInputs",
     "ForecastOutput",
     "ForecastPrediction",
+    "ForecastProbeTarget",
     "ForecastResult",
     "ForecastScore",
     "ForecastSettlement",
@@ -100,6 +163,11 @@ __all__ = [
     "ForecastTargets",
     "ForecastTeacher",
     "ForecastTicket",
+    "IdentificationStatus",
+    "InterventionOperation",
+    "InterventionPlan",
+    "InterventionSpec",
+    "JointEnvelope",
     "O1Config",
     "O1ErrorStream",
     "O1FMConfig",
@@ -109,6 +177,10 @@ __all__ = [
     "NativeO1FMTeacher",
     "O1State",
     "OnlineCausalGraph",
+    "ProbeConflictError",
+    "ProbeEvidence",
+    "ProbePriority",
+    "ProbeReceipt",
     "RMSNorm",
     "RouteTransportResult",
     "SeasonalNaiveForecaster",
@@ -118,7 +190,18 @@ __all__ = [
     "SyntheticDataset",
     "SyntheticSeries",
     "TemporalSelfAttention",
+    "TargetTrajectory",
+    "TeacherBranchProvenance",
+    "TeacherBranchProvenanceProvider",
+    "TeacherBranchRuntime",
     "Toto2Teacher",
+    "TrajectoryExtremes",
+    "SettlementConflictError",
+    "SettlementFragment",
+    "SettlementIntegrityError",
+    "SettlementLedger",
+    "SettlementLedgerError",
+    "apply_intervention",
     "canonical_json_bytes",
     "causal_transport_stack",
     "causal_transport_w1",

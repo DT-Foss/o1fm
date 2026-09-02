@@ -24,6 +24,7 @@ def _load_module(name: str, relative_path: str):
 crystals = _load_module("o1fm_crystals_test", "src/o1fm/crystals.py")
 
 ForecastCrystalBank = crystals.ForecastCrystalBank
+ForecastCrystalConflictError = crystals.ForecastCrystalConflictError
 ForecastCrystalKey = crystals.ForecastCrystalKey
 
 
@@ -86,7 +87,7 @@ def test_crystal_bank_observe_predict_and_persist(tmp_path: Path) -> None:
     assert np.all(mid <= high)
 
     persisted = json.loads(path.read_text(encoding="utf-8"))
-    assert persisted["schema"] == "o1fm.forecast-crystal-bank/v1"
+    assert persisted["schema"] == "o1fm.forecast-crystal-bank/v2"
     assert persisted["entries"][0]["key"]["regime"] == "stable"
 
     reloaded = ForecastCrystalBank(
@@ -321,3 +322,38 @@ def test_crystal_bank_compiles_residual_over_local_base(tmp_path: Path) -> None:
     )
     assert prediction is not None
     np.testing.assert_allclose(prediction.point, [[33.0], [36.0]], atol=1e-3)
+
+
+def test_crystal_observation_ids_are_replay_safe_and_persistent(tmp_path: Path) -> None:
+    path = tmp_path / "replay.json"
+    bank = ForecastCrystalBank(path, min_support=1, min_sequential_support=0)
+    key = _key()
+    first = bank.observe(
+        key,
+        [0.0],
+        [[1.0], [2.0]],
+        observation_id="ticket:1:crystal",
+    )
+    replay = bank.observe(
+        key,
+        [0.0],
+        [[1.0], [2.0]],
+        observation_id="ticket:1:crystal",
+    )
+    assert first.support == replay.support == 1
+
+    restored = ForecastCrystalBank(path, min_support=1, min_sequential_support=0)
+    persisted_replay = restored.observe(
+        key,
+        [0.0],
+        [[1.0], [2.0]],
+        observation_id="ticket:1:crystal",
+    )
+    assert persisted_replay.support == 1
+    with pytest.raises(ForecastCrystalConflictError):
+        restored.observe(
+            key,
+            [0.0],
+            [[9.0], [9.0]],
+            observation_id="ticket:1:crystal",
+        )

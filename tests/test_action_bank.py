@@ -23,6 +23,7 @@ def _load_module(name: str, relative_path: str):
 action_bank = _load_module("o1fm_action_bank_test", "src/o1fm/action_bank.py")
 
 ActionBank = action_bank.ActionBank
+ActionBankConflictError = action_bank.ActionBankConflictError
 ActionProfileKey = action_bank.ActionProfileKey
 ActionReceipt = action_bank.ActionReceipt
 
@@ -96,7 +97,7 @@ def test_action_bank_recommends_cheapest_verified_action(tmp_path: Path) -> None
     )
 
     persisted = json.loads(path.read_text(encoding="utf-8"))
-    assert persisted["schema"] == "o1fm.action-bank/v1"
+    assert persisted["schema"] == "o1fm.action-bank/v2"
 
     reloaded = ActionBank(
         path, quality_tolerance=0.05, coverage_tolerance=0.02, min_support=2
@@ -176,6 +177,30 @@ def test_action_bank_prices_verified_local_teacher(tmp_path: Path) -> None:
     assert recommendation.action == "local"
     assert recommendation.chosen is not None
     assert recommendation.chosen.mean_forward_cost == 0.2
+
+
+def test_action_bank_settlement_ids_are_replay_safe_and_persistent(
+    tmp_path: Path,
+) -> None:
+    path = tmp_path / "actions.json"
+    bank = ActionBank(path, min_support=1)
+    profile = _profile()
+    receipt = ActionReceipt(profile, "foundation", 0.1, 0.8, 0.2, 1.0)
+    first = bank.settle(receipt, settlement_id="ticket:1:foundation")
+    replay = bank.settle(receipt, settlement_id="ticket:1:foundation")
+    assert first.support == replay.support == 1
+
+    restored = ActionBank(path, min_support=1)
+    persisted_replay = restored.settle(
+        receipt,
+        settlement_id="ticket:1:foundation",
+    )
+    assert persisted_replay.support == 1
+    with pytest.raises(ActionBankConflictError):
+        restored.settle(
+            ActionReceipt(profile, "foundation", 0.2, 0.8, 0.2, 1.0),
+            settlement_id="ticket:1:foundation",
+        )
     with pytest.raises(ValueError):
         ActionReceipt(
             profile,

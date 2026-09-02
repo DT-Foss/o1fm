@@ -25,7 +25,7 @@ from .identity import (
 )
 
 FORECAST_ATLAS_SCHEMA = "o1fm.forecast-atlas.forecast/v1"
-SETTLEMENT_ATLAS_SCHEMA = "o1fm.forecast-atlas.settlement/v1"
+SETTLEMENT_ATLAS_SCHEMA = "o1fm.forecast-atlas.settlement/v2"
 TRANSPORT_ATLAS_SCHEMA = "o1fm.forecast-atlas.transport/v1"
 
 _KINDS = frozenset({"forecast", "settlement", "transport"})
@@ -599,10 +599,28 @@ class ForecastAtlas:
                 field="saved_foundation_forwards",
             ),
         }
+        fragment_sha256 = getattr(settlement, "fragment_sha256", _ZERO_SHA256)
+        try:
+            fragment_sha256 = require_sha256(
+                fragment_sha256,
+                field="fragment_sha256",
+            )
+        except IdentityError as exc:
+            raise ForecastAtlasValidationError(str(exc)) from exc
+        observed_values = _integer(
+            getattr(
+                settlement,
+                "observed_values",
+                _field(_field(settlement, "score"), "observed_values"),
+            ),
+            field="settlement.observed_values",
+        )
         settlement_identity = sha256_json(
             {
                 "conformal_update": conformal,
                 "costs": costs,
+                "fragment_sha256": fragment_sha256,
+                "observed_values": observed_values,
                 "o1_update": o1,
                 "scores": scores,
                 "ticket_id": context["ticket_id"],
@@ -619,8 +637,10 @@ class ForecastAtlas:
                 _field(settlement, "crystal_ready"),
                 field="crystal_ready",
             ),
+            "fragment_sha256": fragment_sha256,
             "joint_covered": joint_covered,
             "kind": "settlement",
+            "observed_values": observed_values,
             "o1_update": o1,
             "outcome_key": f"o1fm:settlement:{settlement_identity}",
             "schema": SETTLEMENT_ATLAS_SCHEMA,

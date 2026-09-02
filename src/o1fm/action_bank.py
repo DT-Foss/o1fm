@@ -2,18 +2,37 @@
 
 from __future__ import annotations
 
+import hashlib
 import json
 import math
 import os
+import re
 from collections.abc import Mapping
 from dataclasses import dataclass
 from pathlib import Path
 from tempfile import NamedTemporaryFile
 from types import MappingProxyType
 
-_SCHEMA = "o1fm.action-bank/v1"
+_SCHEMA_V1 = "o1fm.action-bank/v1"
+_SCHEMA = "o1fm.action-bank/v2"
 _ACTIONS = ("foundation", "local", "crystal", "seasonal")
 _MAX_TEXT_BYTES = 1024
+_DIGEST = re.compile(r"[0-9a-f]{64}\Z")
+
+
+class ActionBankConflictError(RuntimeError):
+    """One settlement identity was reused with different action evidence."""
+
+
+def _sha256_document(value: Mapping[str, object]) -> str:
+    encoded = json.dumps(
+        value,
+        allow_nan=False,
+        ensure_ascii=False,
+        sort_keys=True,
+        separators=(",", ":"),
+    ).encode("utf-8")
+    return hashlib.sha256(encoded).hexdigest()
 
 
 def _canonical_text(value: object, *, field: str) -> str:
@@ -386,6 +405,7 @@ class ActionBank:
             maximum=10**6,
         )
         self._profiles: dict[ActionProfileKey, dict[str, _ActionState]] = {}
+        self._settlements: dict[str, str] = {}
         if self._path is not None and self._path.exists():
             self._load()
 
@@ -396,9 +416,31 @@ class ActionBank:
             return path
         return path / "action_bank.json"
 
-    def settle(self, receipt: ActionReceipt) -> ActionStats:
+    def settle(
+        self,
+        receipt: ActionReceipt,
+        *,
+        settlement_id: str | None = None,
+    ) -> ActionStats:
         if not isinstance(receipt, ActionReceipt):
             raise TypeError("receipt must be ActionReceipt")
+        selected_id = (
+            None
+            if settlement_id is None
+            else _canonical_text(settlement_id, field="settlement_id")
+        )
+        content_sha256 = _sha256_document(receipt.to_document())
+        if selected_id is not None:
+            prior = self._settlements.get(selected_id)
+            if prior is not None:
+                if prior != content_sha256:
+                    raise ActionBankConflictError(
+                        "settlement_id is bound to different action evidence"
+                    )
+                existing = self._profiles.get(receipt.profile, {}).get(receipt.action)
+                if existing is None:
+                    raise ValueError("settlement index refers to missing action state")
+                return self._stats_for(receipt.action, existing)
         actions = self._profiles.setdefault(receipt.profile, {})
         state = actions.setdefault(receipt.action, _ActionState(receipts=[]))
         state.support += 1
@@ -410,6 +452,8 @@ class ActionBank:
         state.receipts.append(receipt.to_document())
         if len(state.receipts) > self._max_receipts_per_action:
             del state.receipts[: len(state.receipts) - self._max_receipts_per_action]
+        if selected_id is not None:
+            self._settlements[selected_id] = content_sha256
         self._persist()
         return self._stats_for(receipt.action, state)
 
@@ -530,13 +574,15 @@ class ActionBank:
                 "min_support": self._min_support,
                 "quality_tolerance": self._quality_tolerance,
                 "schema": _SCHEMA,
+                "settlements": dict(sorted(self._settlements.items())),
             },
         )
 
     def _load(self) -> None:
         assert self._path is not None
         document = _json_load(self._path)
-        if document.get("schema") != _SCHEMA:
+        schema = document.get("schema")
+        if schema not in {_SCHEMA_V1, _SCHEMA}:
             raise ValueError("action bank state schema is unsupported")
         entries = document.get("entries")
         if not isinstance(entries, list):
@@ -557,10 +603,21 @@ class ActionBank:
                 actions[canonical] = _ActionState.from_document(state)
             profiles[profile] = actions
         self._profiles = profiles
+        settlements_raw = {} if schema == _SCHEMA_V1 else document.get("settlements")
+        if not isinstance(settlements_raw, Mapping):
+            raise ValueError("action bank settlement index is invalid")
+        settlements: dict[str, str] = {}
+        for raw_id, raw_sha in settlements_raw.items():
+            selected_id = _canonical_text(raw_id, field="settlement_id")
+            if not isinstance(raw_sha, str) or _DIGEST.fullmatch(raw_sha) is None:
+                raise ValueError("action bank settlement hash is invalid")
+            settlements[selected_id] = raw_sha
+        self._settlements = settlements
 
 
 __all__ = [
     "ActionBank",
+    "ActionBankConflictError",
     "ActionProfileKey",
     "ActionReceipt",
     "ActionRecommendation",

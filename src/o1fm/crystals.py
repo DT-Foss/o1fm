@@ -2,9 +2,11 @@
 
 from __future__ import annotations
 
+import hashlib
 import json
 import math
 import os
+import re
 from collections.abc import Mapping, Sequence
 from dataclasses import dataclass
 from pathlib import Path
@@ -17,10 +19,27 @@ from numpy.typing import NDArray
 FloatVector = NDArray[np.float64]
 FloatMatrix = NDArray[np.float64]
 
-_SCHEMA = "o1fm.forecast-crystal-bank/v1"
+_SCHEMA_V1 = "o1fm.forecast-crystal-bank/v1"
+_SCHEMA = "o1fm.forecast-crystal-bank/v2"
 _MAX_TEXT_BYTES = 1024
 _MAX_FEATURES = 4096
 _MAX_OUTPUTS = 16384
+_DIGEST = re.compile(r"[0-9a-f]{64}\Z")
+
+
+class ForecastCrystalConflictError(RuntimeError):
+    """One observation identity was reused with different Crystal evidence."""
+
+
+def _sha256_document(value: Mapping[str, object]) -> str:
+    encoded = json.dumps(
+        value,
+        allow_nan=False,
+        ensure_ascii=False,
+        sort_keys=True,
+        separators=(",", ":"),
+    ).encode("utf-8")
+    return hashlib.sha256(encoded).hexdigest()
 
 
 def _canonical_text(value: object, *, field: str) -> str:
@@ -552,6 +571,7 @@ class ForecastCrystalBank:
             maximum=10**6,
         )
         self._states: dict[ForecastCrystalKey, _CrystalState] = {}
+        self._observations: dict[str, str] = {}
         if self._path is not None and self._path.exists():
             self._load()
 
@@ -637,6 +657,7 @@ class ForecastCrystalBank:
         base_point: object | None = None,
         update_fit: bool = True,
         regime: str | None = None,
+        observation_id: str | None = None,
     ) -> ForecastCrystalStats:
         if not isinstance(key, ForecastCrystalKey):
             raise TypeError("key must be ForecastCrystalKey")
@@ -644,29 +665,18 @@ class ForecastCrystalBank:
             raise TypeError("update_fit must be boolean")
         if regime is not None and _canonical_text(regime, field="regime") != key.regime:
             raise ValueError("regime does not match the crystal key")
+        selected_id = (
+            None
+            if observation_id is None
+            else _canonical_text(observation_id, field="observation_id")
+        )
         state = self._states.get(key)
-        if state is None:
-            if not update_fit:
-                raise ValueError(
-                    "cannot score an unfitted crystal without a fit update"
-                )
-            vector = _feature_vector(features)
-            state = _CrystalState(
-                key=key,
-                feature_dim=int(vector.size),
-                support=0,
-                feature_sum=np.zeros(int(vector.size), dtype=np.float64),
-                target_sum=np.zeros(key.output_dim, dtype=np.float64),
-                gram=np.zeros((int(vector.size), int(vector.size)), dtype=np.float64),
-                cross=np.zeros((int(vector.size), key.output_dim), dtype=np.float64),
-                residual_rows=[],
-                sequential_support=0,
-                absolute_error_sum=0.0,
-                covered_values=0,
-                observed_values=0,
-            )
-            self._states[key] = state
-        vector = _feature_vector(features, expected_size=state.feature_dim)
+        if state is None and not update_fit:
+            raise ValueError("cannot score an unfitted crystal without a fit update")
+        vector = _feature_vector(
+            features,
+            expected_size=None if state is None else state.feature_dim,
+        )
         future = _future_matrix(
             future_target,
             horizon=key.horizon,
@@ -708,6 +718,47 @@ class ForecastCrystalBank:
             )
         fit_flat = fit_future.reshape(key.output_dim) - base_flat
         fit_observed_flat = fit_mask.reshape(key.output_dim)
+        content_sha256 = _sha256_document(
+            {
+                "actual": future.tolist(),
+                "base": base_flat.tolist(),
+                "features": vector.tolist(),
+                "fit": fit_future.tolist(),
+                "fit_mask": fit_mask.tolist(),
+                "key": key.to_document(),
+                "observed_mask": observed_mask.tolist(),
+                "regime": key.regime,
+                "update_fit": update_fit,
+            }
+        )
+        if selected_id is not None:
+            prior = self._observations.get(selected_id)
+            if prior is not None:
+                if prior != content_sha256:
+                    raise ForecastCrystalConflictError(
+                        "observation_id is bound to different Crystal evidence"
+                    )
+                if state is None:
+                    raise ValueError(
+                        "observation index refers to missing Crystal state"
+                    )
+                return self._stats_for(state)
+        if state is None:
+            state = _CrystalState(
+                key=key,
+                feature_dim=int(vector.size),
+                support=0,
+                feature_sum=np.zeros(int(vector.size), dtype=np.float64),
+                target_sum=np.zeros(key.output_dim, dtype=np.float64),
+                gram=np.zeros((int(vector.size), int(vector.size)), dtype=np.float64),
+                cross=np.zeros((int(vector.size), key.output_dim), dtype=np.float64),
+                residual_rows=[],
+                sequential_support=0,
+                absolute_error_sum=0.0,
+                covered_values=0,
+                observed_values=0,
+            )
+            self._states[key] = state
         if state.support > 0:
             residual_before = self._predict_flat(state, vector)
             point_before = base_flat + residual_before
@@ -748,6 +799,9 @@ class ForecastCrystalBank:
             state.target_sum = state.target_sum + target_flat
             state.gram = state.gram + np.outer(vector, vector)
             state.cross = state.cross + np.outer(vector, target_flat)
+
+        if selected_id is not None:
+            self._observations[selected_id] = content_sha256
 
         self._persist()
         return self._stats_for(state)
@@ -855,13 +909,15 @@ class ForecastCrystalBank:
                 "quantile_levels": list(self._quantile_levels),
                 "ridge": self._ridge,
                 "schema": _SCHEMA,
+                "observations": dict(sorted(self._observations.items())),
             },
         )
 
     def _load(self) -> None:
         assert self._path is not None
         document = _json_load(self._path)
-        if document.get("schema") != _SCHEMA:
+        schema = document.get("schema")
+        if schema not in {_SCHEMA_V1, _SCHEMA}:
             raise ValueError("forecast crystal state schema is unsupported")
         entries = document.get("entries")
         if not isinstance(entries, list):
@@ -871,10 +927,21 @@ class ForecastCrystalBank:
             state = _CrystalState.from_document(entry)
             states[state.key] = state
         self._states = states
+        observations_raw = {} if schema == _SCHEMA_V1 else document.get("observations")
+        if not isinstance(observations_raw, Mapping):
+            raise ValueError("forecast crystal observation index is invalid")
+        observations: dict[str, str] = {}
+        for raw_id, raw_sha in observations_raw.items():
+            selected_id = _canonical_text(raw_id, field="observation_id")
+            if not isinstance(raw_sha, str) or _DIGEST.fullmatch(raw_sha) is None:
+                raise ValueError("forecast crystal observation hash is invalid")
+            observations[selected_id] = raw_sha
+        self._observations = observations
 
 
 __all__ = [
     "ForecastCrystalBank",
+    "ForecastCrystalConflictError",
     "ForecastCrystalKey",
     "ForecastCrystalPrediction",
     "ForecastCrystalStats",

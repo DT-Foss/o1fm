@@ -4,6 +4,7 @@ import json
 from pathlib import Path
 
 import numpy as np
+import pytest
 import torch
 
 from o1fm.action_bank import ActionBank
@@ -19,6 +20,7 @@ from o1fm.metrics import score_prediction
 from o1fm.model import ForecastResult, O1FMConfig, O1FMForecaster
 from o1fm.o1 import O1Config, O1ErrorStream
 from o1fm.runtime import O1FMRuntime, RouteSelection
+from o1fm.settlements import SettlementConflictError
 from o1fm.training import tensorize_inputs
 
 
@@ -482,4 +484,104 @@ def test_runtime_emits_direct_forecast_transport_and_settlement_citations(
     assert store.sequence == 3
     assert atlas.record(ticket.atlas_forecast_receipt)["kind"] == "forecast"
     assert atlas.record(ticket.atlas_transport_receipt)["kind"] == "transport"
-    assert atlas.record(settlement.atlas_settlement_receipt)["kind"] == "settlement"
+    settlement_record = atlas.record(settlement.atlas_settlement_receipt)
+    assert settlement_record["kind"] == "settlement"
+    assert settlement_record["fragment_sha256"] == settlement.fragment_sha256
+    assert settlement_record["observed_values"] == settlement.observed_values
+    replay = runtime.settle(ticket, _target(_inputs()))
+    assert replay.replayed
+    assert replay.atlas_settlement_receipt is not None
+    assert replay.atlas_settlement_receipt.segment_sha256 == (
+        settlement.atlas_settlement_receipt.segment_sha256
+    )
+    assert store.sequence == 3
+
+
+def test_runtime_settlement_replay_does_not_double_charge_state(tmp_path: Path) -> None:
+    foundation = InjectedTeacher()
+    field = O1ConformalField(tmp_path / "field-replay")
+    runtime = O1FMRuntime(
+        foundation,
+        model_identity="9" * 64,
+        o1=O1ErrorStream(tmp_path / "o1-replay.json", stream_id="series-a"),
+        graph=OnlineCausalGraph(tmp_path / "graph-replay", graph_id="series-a"),
+        crystals=ForecastCrystalBank(
+            tmp_path / "crystals-replay.json",
+            quantile_levels=foundation.quantile_levels,
+        ),
+        actions=ActionBank(tmp_path / "actions-replay.json"),
+        conformal=field,
+        enable_seasonal=False,
+    )
+    ticket = runtime.forecast(_inputs())
+    first = runtime.settle(ticket, _target(_inputs()))
+    second = runtime.settle(ticket, _target(_inputs()))
+
+    assert second.o1_update.duplicate is True
+    assert second.calibration_update is not None
+    assert second.calibration_update.replayed is True
+    assert runtime.o1.state.observations == 1
+    assert field.metrics()["settlements"] == 1
+    crystal = runtime.crystals.describe(ticket.crystal_key)
+    assert crystal is not None and crystal.support == 1
+    action = runtime.actions.describe(ticket.profile)["foundation"]
+    assert action.support == 1
+    assert first.score == second.score
+
+
+def test_runtime_settles_growing_partial_horizons_exactly_once(tmp_path: Path) -> None:
+    foundation = InjectedTeacher()
+    field = O1ConformalField(tmp_path / "field-partial")
+    runtime = O1FMRuntime(
+        foundation,
+        model_identity="8" * 64,
+        o1=O1ErrorStream(tmp_path / "o1-partial.json", stream_id="series-a"),
+        graph=OnlineCausalGraph(tmp_path / "graph-partial", graph_id="series-a"),
+        crystals=ForecastCrystalBank(
+            tmp_path / "crystals-partial.json",
+            quantile_levels=foundation.quantile_levels,
+        ),
+        actions=ActionBank(tmp_path / "actions-partial.json"),
+        conformal=field,
+        enable_seasonal=False,
+    )
+    inputs = _inputs()
+    ticket = runtime.forecast(inputs)
+    full = _target(inputs)
+    first_mask = np.zeros_like(full.mask)
+    first_mask[0, 0] = True
+    first_target = ForecastTarget(
+        series_id=full.series_id,
+        timestamps=full.timestamps,
+        values=full.values,
+        mask=first_mask,
+    )
+
+    first = runtime.settle(ticket, first_target)
+    remainder = runtime.settle(ticket, full)
+    replay = runtime.settle(ticket, full)
+
+    assert first.observed_values == 1
+    assert remainder.observed_values == int(full.mask.sum()) - 1
+    assert not first.replayed and not remainder.replayed
+    assert replay.replayed and replay.o1_update.duplicate
+    assert replay.fragment_sha256 == remainder.fragment_sha256
+    assert runtime.o1.state.observations == 2
+    assert field.metrics()["settlements"] == 2
+    crystal = runtime.crystals.describe(ticket.crystal_key)
+    assert crystal is not None and crystal.support == 2
+    action = runtime.actions.describe(ticket.profile)["foundation"]
+    assert action.support == 2
+
+    changed = np.array(full.values, copy=True)
+    changed[0, 0] += 1.0
+    with pytest.raises(SettlementConflictError):
+        runtime.settle(
+            ticket,
+            ForecastTarget(
+                series_id=full.series_id,
+                timestamps=full.timestamps,
+                values=changed,
+                mask=full.mask,
+            ),
+        )
