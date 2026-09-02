@@ -19,6 +19,9 @@ Repository = "https://github.com/DT-Foss/o1fm"
 
 [project.optional-dependencies]
 dev = ["pytest>=8", "ruff>=0.9"]
+toto = ["toto-models>=1.0.0"]
+chronos = ["chronos-forecasting>=2.0"]
+teachers = ["toto-models>=1.0.0", "chronos-forecasting>=2.0"]
 
 [build-system]
 requires = ["setuptools>=68"]

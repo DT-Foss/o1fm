@@ -621,14 +621,23 @@ class ForecastCrystalBank:
         future_target: object,
         *,
         future_target_mask: object | None = None,
+        fit_target: object | None = None,
+        fit_target_mask: object | None = None,
+        update_fit: bool = True,
         regime: str | None = None,
     ) -> ForecastCrystalStats:
         if not isinstance(key, ForecastCrystalKey):
             raise TypeError("key must be ForecastCrystalKey")
+        if not isinstance(update_fit, bool):
+            raise TypeError("update_fit must be boolean")
         if regime is not None and _canonical_text(regime, field="regime") != key.regime:
             raise ValueError("regime does not match the crystal key")
         state = self._states.get(key)
         if state is None:
+            if not update_fit:
+                raise ValueError(
+                    "cannot score an unfitted crystal without a fit update"
+                )
             vector = _feature_vector(features)
             state = _CrystalState(
                 key=key,
@@ -659,16 +668,33 @@ class ForecastCrystalBank:
         )
         observed_flat = observed_mask.reshape(key.output_dim)
         observed_count = int(np.count_nonzero(observed_flat))
-        future_flat = future.reshape(key.output_dim)
+        actual_flat = future.reshape(key.output_dim)
+        if fit_target is None:
+            fit_future = future
+            fit_mask = observed_mask
+        else:
+            fit_future = _future_matrix(
+                fit_target,
+                horizon=key.horizon,
+                target_count=key.target_count,
+                mask=fit_target_mask,
+            )
+            fit_mask = _future_mask(
+                fit_target_mask,
+                horizon=key.horizon,
+                target_count=key.target_count,
+            )
+        fit_flat = fit_future.reshape(key.output_dim)
+        fit_observed_flat = fit_mask.reshape(key.output_dim)
         if state.support > 0:
             point_before = self._predict_flat(state, vector)
-            target_flat = np.where(observed_flat, future_flat, point_before)
+            target_flat = np.where(fit_observed_flat, fit_flat, point_before)
         else:
             point_before = np.zeros(key.output_dim, dtype=np.float64)
-            target_flat = np.where(observed_flat, future_flat, 0.0)
+            target_flat = np.where(fit_observed_flat, fit_flat, 0.0)
 
         if state.support > 0 and observed_count > 0:
-            residual = target_flat - point_before
+            residual = np.where(observed_flat, actual_flat - point_before, 0.0)
             observed_residual = residual[observed_flat]
             state.sequential_support += 1
             state.absolute_error_sum += float(np.abs(observed_residual).sum())
@@ -679,7 +705,7 @@ class ForecastCrystalBank:
             upper = quantiles_before[max(quantiles_before)]
             state.covered_values += int(
                 np.count_nonzero(
-                    observed_flat & (target_flat >= lower) & (target_flat <= upper)
+                    observed_flat & (actual_flat >= lower) & (actual_flat <= upper)
                 )
             )
             state.observed_values += observed_count
@@ -689,11 +715,12 @@ class ForecastCrystalBank:
                     : len(state.residual_rows) - self._max_residual_history
                 ]
 
-        state.support += 1
-        state.feature_sum = state.feature_sum + vector
-        state.target_sum = state.target_sum + target_flat
-        state.gram = state.gram + np.outer(vector, vector)
-        state.cross = state.cross + np.outer(vector, target_flat)
+        if update_fit:
+            state.support += 1
+            state.feature_sum = state.feature_sum + vector
+            state.target_sum = state.target_sum + target_flat
+            state.gram = state.gram + np.outer(vector, vector)
+            state.cross = state.cross + np.outer(vector, target_flat)
 
         self._persist()
         return self._stats_for(state)

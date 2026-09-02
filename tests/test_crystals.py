@@ -213,3 +213,78 @@ def test_crystal_bank_rejects_invalid_future_target_mask(tmp_path: Path) -> None
             [[1.0], [2.0]],
             future_target_mask=[[True, False]],
         )
+
+
+def test_crystal_bank_compiles_fit_target_and_scores_realized_residuals(
+    tmp_path: Path,
+) -> None:
+    path = tmp_path / "crystals.json"
+    bank = ForecastCrystalBank(
+        path,
+        ridge=1e-6,
+        min_support=2,
+        min_sequential_support=1,
+        quantile_levels=(0.1, 0.5, 0.9),
+    )
+    key = _key()
+    bank.observe(
+        key,
+        [0.0],
+        [[100.0], [100.0]],
+        fit_target=[[1.0], [2.0]],
+    )
+    stats = bank.observe(
+        key,
+        [1.0],
+        [[103.0], [104.0]],
+        fit_target=[[3.0], [4.0]],
+    )
+
+    prediction = bank.predict(key, [2.0])
+    assert prediction is not None
+    np.testing.assert_allclose(prediction.point, [[5.0], [6.0]], atol=1e-3)
+    assert stats.mean_absolute_error == pytest.approx(102.0)
+
+    persisted = json.loads(path.read_text(encoding="utf-8"))["entries"][0]
+    assert persisted["target_sum"] == [4.0, 6.0]
+    assert persisted["residual_rows"][-1] == pytest.approx([102.0, 102.0])
+
+    before_support = stats.support
+    scored = bank.observe(
+        key,
+        [2.0],
+        [[7.0], [8.0]],
+        fit_target=[[999.0], [999.0]],
+        update_fit=False,
+    )
+    assert scored.support == before_support
+    persisted = json.loads(path.read_text(encoding="utf-8"))["entries"][0]
+    assert persisted["target_sum"] == [4.0, 6.0]
+
+    with pytest.raises(ValueError, match="unfitted"):
+        ForecastCrystalBank(tmp_path / "empty.json").observe(
+            key,
+            [0.0],
+            [[1.0], [2.0]],
+            update_fit=False,
+        )
+
+    coverage_bank = ForecastCrystalBank(
+        tmp_path / "coverage.json",
+        min_support=2,
+        min_sequential_support=1,
+        quantile_levels=(0.1, 0.5, 0.9),
+    )
+    coverage_bank.observe(
+        key,
+        [0.0],
+        [[1.0], [2.0]],
+        fit_target=[[1.0], [2.0]],
+    )
+    coverage_stats = coverage_bank.observe(
+        key,
+        [1.0],
+        [[1.0], [2.0]],
+        fit_target=[[100.0], [200.0]],
+    )
+    assert coverage_stats.empirical_coverage == 1.0

@@ -9,6 +9,7 @@ import torch
 
 from o1fm.contracts import ForecastInputs
 from o1fm.model import DEFAULT_QUANTILES, O1FMConfig, O1FMForecaster
+from o1fm.open_teacher_demo import _module_sha256
 from o1fm.teachers import (
     Chronos2Teacher,
     ForecastTeacher,
@@ -95,9 +96,7 @@ def test_toto_maps_masks_covariates_and_quantiles() -> None:
     )
     np.testing.assert_array_equal(
         payload["target_mask"][0].cpu().numpy(),
-        np.concatenate(
-            (inputs.past_target_mask, inputs.past_covariate_mask), axis=1
-        ).T,
+        np.concatenate((inputs.past_target_mask, inputs.past_covariate_mask), axis=1).T,
     )
     assert payload["series_ids"].tolist() == [[0, 0, 0]]
     assert payload["known_dynamic"].shape == (1, 1, 7)
@@ -129,6 +128,31 @@ def test_toto_rejects_crossed_or_wrong_shaped_output() -> None:
 
     with pytest.raises(ValueError, match="must have shape"):
         Toto2Teacher(WrongShapeToto()).predict(_inputs())
+
+
+def test_toto_loader_uses_safetensors_compatible_device_string(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    class LoadableToto(_FakeToto):
+        @classmethod
+        def from_pretrained(cls, checkpoint: str, *, map_location: str):
+            assert checkpoint == "Datadog/Toto-2.0-22m"
+            assert map_location == "cpu"
+            return cls()
+
+        def to(self, device):  # type: ignore[no-untyped-def]
+            return self
+
+        def eval(self):
+            return self
+
+    monkeypatch.setattr(
+        importlib,
+        "import_module",
+        lambda name: SimpleNamespace(Toto2Model=LoadableToto),
+    )
+    teacher = Toto2Teacher.from_pretrained(device="cpu")
+    assert isinstance(teacher, Toto2Teacher)
 
 
 class _FakeChronos:
@@ -236,6 +260,16 @@ def test_native_teacher_and_identity_contract() -> None:
     assert first == second
     assert first != teacher_identity("adapter/v2", "org/model", DEFAULT_QUANTILES)
     assert first != teacher_identity("adapter/v1", "org/model-2", DEFAULT_QUANTILES)
+
+
+def test_weight_identity_handles_scalar_and_matrix_state() -> None:
+    module = torch.nn.Module()
+    module.register_parameter("scalar", torch.nn.Parameter(torch.tensor(1.0)))
+    module.register_buffer("matrix", torch.arange(6, dtype=torch.float32).reshape(2, 3))
+    first = _module_sha256(module)
+    assert first is not None and len(first) == 64
+    module.scalar.data.add_(1.0)
+    assert _module_sha256(module) != first
 
 
 @pytest.mark.parametrize(

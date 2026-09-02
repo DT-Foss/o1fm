@@ -113,8 +113,8 @@
   },
   "schema": "o1fm.demo-result/v2",
   "timing": {
-    "runtime_seconds": 7.9120507090119645,
-    "training_seconds": 2.8636455410160124
+    "runtime_seconds": 0.3771737499628216,
+    "training_seconds": 3.002862082910724
   },
   "training": {
     "best_loss": 0.09576303698122501,

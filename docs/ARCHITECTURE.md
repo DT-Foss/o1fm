@@ -21,7 +21,7 @@ ForecastBatch
   -> ActionBank.recommend
        -> ForecastCrystal.predict       # zero foundation forwards
        -> StructuralBaseline.predict    # zero foundation forwards
-       -> O1FMModel.forward             # novelty authority
+       -> ForecastTeacher.predict       # novelty authority
   -> DirectedConformalField.apply       # prior settlements only
   -> ForecastVerifier
   -> ForecastTicket
@@ -37,6 +37,19 @@ ForecastTicket + realized future
 
 Every learned object is scoped by model identity, feature schema, horizon,
 causal-graph revision, and O1 regime generation.
+
+## Open teacher protocol
+
+The novelty authority is a strict `ForecastTeacher`, not a concrete model
+class. Native O1FM, Toto-2 and Chronos-2 all consume `ForecastInputs` and return
+the identical immutable `ForecastPrediction` contract. External packages load
+lazily and remain optional. Teacher identities bind adapter, checkpoint and
+quantile inventory; executable receipts additionally hash the loaded tensors.
+
+Toto-2 maps targets and past-only covariates into historical variates and maps
+known-future channels through its dynamic-covariate input. Chronos-2 receives the
+same roles through its official list-of-dictionaries API. Everything after the
+teacher call—Conformal Field, O1, Graph, Crystals and ActionBank—is shared.
 
 ## Directed conformal control
 
@@ -130,6 +143,11 @@ route state immediately. The exact `(source, target, lag, kind)` tuples form the
 graph identity used by Crystals and Action profiles. This keeps routing online
 without fragmenting stored compute on one-window score jitter.
 
+Rolling windows are appended through `observe_many()`. The complete batch is
+validated before mutation, the persistent event chain is loaded once, and the
+directory is synchronized once after the appended suffix. Serial and batched
+paths produce identical graph revisions and edges.
+
 ## Forecast Crystals
 
 A Forecast Crystal is a compact local action, not a cached answer. Context is
@@ -139,11 +157,16 @@ statistics:
 
 ```text
 G <- G + phi phi^T
-B <- B + phi y_future^T
+B <- B + phi z_fit^T
 W  = (G + lambda I)^-1 B
 ```
 
-Residual quantiles supply uncertainty. A Crystal becomes executable when its
+External-teacher mode sets `z_teacher` to the uncalibrated teacher trajectory;
+an executed Crystal supplies its own point as a neutral self-target. Unrelated
+structural actions update residual evidence without changing the Crystal fit.
+Native mode instead fits the realized local dynamics directly.
+Both modes use realized outcomes for residual quantiles, error and promotion
+authority. A Crystal becomes executable when its
 sequential support, error, bias, and interval coverage satisfy its promotion
 contract. Regime or graph changes select another Crystal rather than mutating a
 foreign one. Partial settlements update every observed horizon cell immediately;

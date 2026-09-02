@@ -95,13 +95,48 @@ atomic action/route/regime state are all in the live runtime.
 
 The committed receipt is
 [`results/o1fm-directed-conformal-v1.json`](results/o1fm-directed-conformal-v1.json),
-SHA-256 `85c49fc48ea4abb70b260a81a7d7b796b7ed720dbbddbd96a35c01f7af520d7b`.
+SHA-256 `b0f62cc3b7a5de5c4494bd9099496bebfe73def2bc621b66ff5bc94335e59c8e`.
 
 An independent `--no-conformal` control reproduced the same six-foundation /
 six-Crystal action trace, 57.64% coverage and 0.12314 pinball. Its committed
 receipt is
 [`results/o1fm-no-conformal-control-v1.json`](results/o1fm-no-conformal-control-v1.json),
-SHA-256 `31c812a498dc2d8dd23263dca9e7e5eb99f5ef6053602ee71c877e444d8d272c`.
+SHA-256 `97c9f70831c83d8c006dd009ca1a53cdd3a309c1e68517683da06657b33904bb`.
+
+## Real open-weight teacher result
+
+O1FM now runs unchanged over real Toto-2.0 weights through the common
+`ForecastTeacher` contract. The receipt pins the loaded 21,915,584-parameter
+checkpoint by its tensor SHA-256 and executes 24 non-overlapping multivariate
+windows with past-only and known-future covariates.
+
+| Metric | Raw Toto-22M | Calibrated all-Toto control | Adaptive O1FM |
+|---|---:|---:|---:|
+| Toto forwards | 24 | 24 | **15** |
+| Verified structural executions | 0 | 0 | **9** |
+| Marginal coverage | 82.37% | 86.92% | **85.74%** |
+| Joint trajectory coverage | 12.5% | 87.5% | **87.5%** |
+| MAE | 0.14920 | 0.14920 | 0.15933 |
+| Mean pinball | 0.06026 | 0.06471 | 0.06789 |
+
+With an ActionBank pinball tolerance of `0.005`, the control plane removes
+37.5% of Toto forwards. Against the identically calibrated all-Toto control,
+the adaptive policy changes pinball by `+0.00318`, coverage by `-1.17`
+percentage points and MAE by `+0.01014`. The joint envelope remains unchanged.
+The 22M teacher itself averages 12.3 ms per direct 3-target × 16-horizon
+forecast on the recorded arm64 CPU environment.
+The strict gate selects nine seasonal actions and zero ridge Crystals; contextual
+teacher-state compilation is the next Crystal upgrade.
+
+The causal graph now appends each rolling history as one validated batch. It
+reloads and fsyncs once per forecast instead of once per timestamp, removing the
+dominant control-plane latency without changing event hashes or graph edges.
+
+The committed receipt is
+[`results/o1fm-toto22m-control-plane-v1.json`](results/o1fm-toto22m-control-plane-v1.json),
+SHA-256 `8a3547628d338f391a0884bc75942e67374a2ee675e6b573545dddfaf6daad7f`.
+The loaded Toto tensors hash to
+`18b094801c589af0e6c9f900bf7f868541ce975712be9ac4a06d4529b647e4b2`.
 
 ## Relationship to TimesFM
 
@@ -128,6 +163,13 @@ References:
 python -m pip install -e '.[dev]'
 python -m pytest
 python -m o1fm demo
+```
+
+Run the real Apache-2.0 Toto teacher path:
+
+```bash
+python -m pip install -e '.[toto]'
+python -m o1fm teacher-demo --teacher toto2
 ```
 
 O1FM is developed by David Tom Foss.

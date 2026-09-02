@@ -190,7 +190,7 @@ class Toto2Teacher:
             ) from exc
         model = model_class.from_pretrained(
             checkpoint,
-            map_location=torch.device(device),
+            map_location=str(torch.device(device)),
         )
         model = model.to(device).eval()
         return cls(model, checkpoint=checkpoint, device=device)
@@ -408,9 +408,7 @@ def _chronos_frame(
         ]
 
     timestamps = (
-        _frame_column(frame, columns["timestamp"])
-        if "timestamp" in columns
-        else None
+        _frame_column(frame, columns["timestamp"]) if "timestamp" in columns else None
     )
     quantiles = np.empty(
         (inputs.horizon, inputs.target_dim, len(levels)), dtype=np.float32
@@ -426,9 +424,9 @@ def _chronos_frame(
         if timestamps is not None:
             selected = selected[np.argsort(timestamps[selected])]
         for level_index, column in enumerate(quantile_columns):
-            quantiles[:, target_index, level_index] = _frame_column(
-                frame, column
-            )[selected]
+            quantiles[:, target_index, level_index] = _frame_column(frame, column)[
+                selected
+            ]
         if point is not None:
             point[:, target_index] = _frame_column(frame, point_column)[selected]
     return quantiles, point
@@ -503,9 +501,7 @@ class Chronos2Teacher:
                 quantile_count=len(self.quantile_levels),
             )
             point = (
-                None
-                if raw_point is None
-                else _chronos_point(raw_point, inputs=inputs)
+                None if raw_point is None else _chronos_point(raw_point, inputs=inputs)
             )
         return _prediction(
             inputs,

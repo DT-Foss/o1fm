@@ -37,12 +37,20 @@ from .losses import forecast_loss, monotone_penalty, pinball_loss
 from .metrics import ForecastScore, score_prediction, verify_prediction
 from .model import ForecastBatch, ForecastResult, O1FMConfig, O1FMForecaster
 from .o1 import O1Config, O1ErrorStream, O1State
+from .open_teacher_demo import run_open_teacher_demo
 from .runtime import ForecastSettlement, ForecastTicket, O1FMRuntime
 from .synthetic import (
     SyntheticConfig,
     SyntheticDataset,
     SyntheticSeries,
     generate_synthetic_dataset,
+)
+from .teachers import (
+    Chronos2Teacher,
+    ForecastTeacher,
+    NativeO1FMTeacher,
+    Toto2Teacher,
+    teacher_identity,
 )
 from .training import model_identity, predict, tensorize_inputs, train_forecaster
 
@@ -61,6 +69,7 @@ __all__ = [
     "ConformalFieldKey",
     "ConformalIntegrityError",
     "ConformalUpdate",
+    "Chronos2Teacher",
     "CrossVariateSinkhornAttention",
     "FEATURE_ABI",
     "ForecastBatch",
@@ -76,6 +85,7 @@ __all__ = [
     "ForecastSettlement",
     "ForecastTarget",
     "ForecastTargets",
+    "ForecastTeacher",
     "ForecastTicket",
     "O1Config",
     "O1ErrorStream",
@@ -83,6 +93,7 @@ __all__ = [
     "O1FMForecaster",
     "O1FMRuntime",
     "O1ConformalField",
+    "NativeO1FMTeacher",
     "O1State",
     "OnlineCausalGraph",
     "RMSNorm",
@@ -92,6 +103,7 @@ __all__ = [
     "SyntheticDataset",
     "SyntheticSeries",
     "TemporalSelfAttention",
+    "Toto2Teacher",
     "canonical_json_bytes",
     "extract_features",
     "feature_schema",
@@ -103,10 +115,12 @@ __all__ = [
     "pinball_loss",
     "predict",
     "revin",
+    "run_open_teacher_demo",
     "score_prediction",
     "sha256_json",
     "sinkhorn_transport",
     "tensorize_inputs",
+    "teacher_identity",
     "train_forecaster",
     "verify_prediction",
 ]

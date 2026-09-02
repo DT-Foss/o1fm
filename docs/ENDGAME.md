@@ -181,7 +181,7 @@ fallback for novelty. [DistilTS](https://arxiv.org/abs/2601.12785)
 ## Route to the full system
 
 1. Directed O1 Conformal Field with marginal and joint receipts.
-2. Toto-2.0-22M and Chronos-2 adapters behind one teacher protocol.
+2. Toto-2.0-22M and Chronos-2 adapters behind one teacher protocol. **Running.**
 3. Factual and intervention-aware trajectory Crystals.
 4. `.causal` live Atlas records for routes, field revisions and compiled
    response surfaces.
@@ -194,3 +194,12 @@ The terminal product does not merely answer “what happens next?” It maintain
 live executable map of what can happen, why, how confident the system is, what
 changes under intervention, and which future computation has already been paid.
 
+## First open-teacher execution
+
+The Toto-2.0-22M adapter has now completed the full loop with actual Apache-2.0
+weights. Across 24 windows, ActionBank replaced nine teacher calls under a
+`0.005` pinball tolerance. The adaptive path retained 85.74% marginal and 87.5%
+joint coverage; the all-teacher calibrated control measured 86.92% and 87.5%.
+The result pins all 21,915,584 loaded parameters by SHA-256. No ridge Crystal
+passed this strict gate, which fixes the next compiler task: replace summary-only
+Crystal inputs with contextual teacher states and causal path features.

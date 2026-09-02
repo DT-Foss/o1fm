@@ -113,6 +113,66 @@ def test_graph_rejects_invalid_inputs_without_revision(tmp_path: Path) -> None:
     assert graph.revision.sequence == 0
 
 
+def test_graph_observe_many_matches_serial_and_reloads_once(tmp_path: Path) -> None:
+    serial = OnlineCausalGraph(
+        tmp_path / "serial",
+        graph_id="shared",
+        config=CausalGraphConfig(max_lag=2, min_observations=2),
+    )
+    batched = OnlineCausalGraph(
+        tmp_path / "batched",
+        graph_id="shared",
+        config=CausalGraphConfig(max_lag=2, min_observations=2),
+    )
+    rows = tuple(
+        {
+            "timestamp_ns": index,
+            "targets": {"demand": float(index * 2)},
+            "covariates": {"driver": float(index)},
+            "known_future": {"promotion": float(index % 2)},
+            "observation_id": f"row-{index}",
+        }
+        for index in range(8)
+    )
+    for row in rows:
+        serial.observe(**row)
+
+    reloads = 0
+    original_reload = batched._reload_locked
+
+    def counted_reload() -> None:
+        nonlocal reloads
+        reloads += 1
+        original_reload()
+
+    batched._reload_locked = counted_reload  # type: ignore[method-assign]
+    revisions = batched.observe_many(rows)
+
+    assert reloads == 1
+    assert all(revision.appended for revision in revisions)
+    assert batched.revision == serial.revision
+    assert batched.all_edges() == serial.all_edges()
+    restored = OnlineCausalGraph(
+        tmp_path / "batched",
+        graph_id="shared",
+        config=CausalGraphConfig(max_lag=2, min_observations=2),
+    )
+    assert restored.all_edges() == batched.all_edges()
+
+
+def test_graph_observe_many_preflights_entire_batch(tmp_path: Path) -> None:
+    graph = OnlineCausalGraph(tmp_path / "graph")
+    with pytest.raises(ValueError, match="increase strictly"):
+        graph.observe_many(
+            (
+                {"timestamp_ns": 2, "targets": {"y": 1.0}},
+                {"timestamp_ns": 1, "targets": {"y": 2.0}},
+            )
+        )
+    assert graph.revision.sequence == 0
+    assert not tuple((tmp_path / "graph" / "events").iterdir())
+
+
 def test_graph_hash_chain_detects_tampering(tmp_path: Path) -> None:
     root = tmp_path / "graph"
     graph = OnlineCausalGraph(root)

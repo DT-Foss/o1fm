@@ -25,7 +25,7 @@ from .identity import sha256_json
 from .metrics import ForecastScore, score_prediction, verify_prediction
 from .model import O1FMForecaster
 from .o1 import O1ErrorStream, O1Update
-from .training import predict as foundation_predict
+from .teachers import ForecastTeacher, NativeO1FMTeacher
 
 
 @dataclass(frozen=True, slots=True)
@@ -95,7 +95,7 @@ class O1FMRuntime:
 
     def __init__(
         self,
-        model: O1FMForecaster,
+        model: O1FMForecaster | ForecastTeacher,
         *,
         model_identity: str,
         o1: O1ErrorStream,
@@ -103,14 +103,20 @@ class O1FMRuntime:
         crystals: ForecastCrystalBank,
         actions: ActionBank,
         conformal: O1ConformalField | None = None,
+        compile_teacher_crystals: bool | None = None,
         seasonal_period: int = 24,
         route_top_k: int = 8,
         route_stability: int = 3,
         enable_seasonal: bool = True,
         device: str = "cpu",
     ) -> None:
-        if not isinstance(model, O1FMForecaster):
-            raise TypeError("model must be O1FMForecaster")
+        teacher: ForecastTeacher
+        if isinstance(model, O1FMForecaster):
+            teacher = NativeO1FMTeacher(model, device=device)
+        elif isinstance(model, ForecastTeacher):
+            teacher = model
+        else:
+            raise TypeError("model must be O1FMForecaster or ForecastTeacher")
         if not isinstance(model_identity, str) or len(model_identity) != 64:
             raise ValueError("model_identity must be a SHA-256 digest")
         if (
@@ -123,17 +129,27 @@ class O1FMRuntime:
             raise ValueError("runtime routing controls must be positive")
         if not isinstance(enable_seasonal, bool):
             raise TypeError("enable_seasonal must be boolean")
-        if tuple(crystals.quantile_levels) != tuple(model.config.quantiles):
+        if tuple(crystals.quantile_levels) != tuple(teacher.quantile_levels):
             raise ValueError("Crystal and foundation quantile inventories must match")
         if conformal is not None and not isinstance(conformal, O1ConformalField):
             raise TypeError("conformal must be O1ConformalField or None")
+        if compile_teacher_crystals is not None and not isinstance(
+            compile_teacher_crystals, bool
+        ):
+            raise TypeError("compile_teacher_crystals must be boolean or None")
         self.model = model
+        self.teacher = teacher
         self.model_identity = model_identity
         self.o1 = o1
         self.graph = graph
         self.crystals = crystals
         self.actions = actions
         self.conformal = conformal
+        self.compile_teacher_crystals = (
+            not isinstance(teacher, NativeO1FMTeacher)
+            if compile_teacher_crystals is None
+            else compile_teacher_crystals
+        )
         self.seasonal = SeasonalNaiveForecaster(
             period=seasonal_period,
             quantile_levels=crystals.quantile_levels,
@@ -159,6 +175,7 @@ class O1FMRuntime:
         return f"known:{index}"
 
     def _observe_graph_history(self, inputs: ForecastInputs) -> None:
+        observations: list[dict[str, object]] = []
         for row, timestamp in enumerate(inputs.past_timestamps):
             targets = {
                 self._target_name(index): float(inputs.past_target[row, index])
@@ -177,13 +194,20 @@ class O1FMRuntime:
                 for index in range(inputs.known_covariate_dim)
                 if inputs.known_covariate_mask[row, index]
             }
-            self.graph.observe(
-                timestamp_ns=int(timestamp.astype("datetime64[ns]").astype(np.int64)),
-                targets=targets,
-                covariates=covariates,
-                known_future=known,
-                observation_id=f"obs:{inputs.series_id}:{int(timestamp.astype(np.int64))}",
+            observations.append(
+                {
+                    "timestamp_ns": int(
+                        timestamp.astype("datetime64[ns]").astype(np.int64)
+                    ),
+                    "targets": targets,
+                    "covariates": covariates,
+                    "known_future": known,
+                    "observation_id": (
+                        f"obs:{inputs.series_id}:{int(timestamp.astype(np.int64))}"
+                    ),
+                }
             )
+        self.graph.observe_many(observations)
 
     def _route_candidate(self, inputs: ForecastInputs) -> RouteSelection:
         edges: list[CausalEdge] = []
@@ -367,11 +391,7 @@ class O1FMRuntime:
         else:
             action = "foundation"
             started = time.perf_counter()
-            base_prediction = foundation_predict(
-                self.model,
-                inputs,
-                device=self.device,
-            )
+            base_prediction = self.teacher.predict(inputs)
             calibration = self._calibrate(
                 profile,
                 action,
@@ -477,6 +497,14 @@ class O1FMRuntime:
             ticket.features,
             target.values,
             future_target_mask=target.mask,
+            fit_target=(
+                ticket.base_prediction.point if self.compile_teacher_crystals else None
+            ),
+            update_fit=(
+                not self.compile_teacher_crystals
+                or ticket.foundation_forwards == 1
+                or ticket.action == "crystal"
+            ),
             regime=ticket.regime,
         )
 

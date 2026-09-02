@@ -10,7 +10,7 @@ import secrets
 import stat
 import threading
 import unicodedata
-from collections.abc import Iterator, Mapping
+from collections.abc import Iterator, Mapping, Sequence
 from contextlib import contextmanager
 from dataclasses import dataclass
 from pathlib import Path
@@ -507,6 +507,7 @@ class OnlineCausalGraph:
         observation_id: str,
         observation_sha256: str,
         record: Mapping[str, object],
+        sync_directory: bool = True,
     ) -> str:
         sequence = self._sequence + 1
         body = {
@@ -546,25 +547,24 @@ class OnlineCausalGraph:
             os.close(descriptor)
         try:
             os.link(temporary, destination, follow_symlinks=False)
-            _fsync_directory(self.events)
+            if sync_directory:
+                _fsync_directory(self.events)
         except FileExistsError as exc:
             raise CausalGraphConflictError("graph revision already exists") from exc
         finally:
             temporary.unlink(missing_ok=True)
         return digest
 
-    def observe(
-        self,
+    @staticmethod
+    def _prepare_observation(
         *,
         timestamp_ns: int,
         targets: Mapping[str, float],
-        covariates: Mapping[str, float] | None = None,
-        known_future: Mapping[str, float] | None = None,
-        observation_id: str | None = None,
-    ) -> GraphRevision:
-        """Append one realized time step and update lag/intervention moments."""
-
-        record = {
+        covariates: Mapping[str, float] | None,
+        known_future: Mapping[str, float] | None,
+        observation_id: str | None,
+    ) -> tuple[dict[str, object], str, str]:
+        record: dict[str, object] = {
             "covariates": _float_map(
                 {} if covariates is None else covariates,
                 field="covariates",
@@ -578,9 +578,9 @@ class OnlineCausalGraph:
             "targets": _float_map(targets, field="targets", required=True),
             "timestamp_ns": _uint(timestamp_ns, field="timestamp_ns"),
         }
-        if set(record["targets"]) & set(record["covariates"]):
+        if set(record["targets"]) & set(record["covariates"]):  # type: ignore[arg-type]
             raise ValueError("target and covariate names must be disjoint")
-        if set(record["targets"]) & set(record["known_future"]):
+        if set(record["targets"]) & set(record["known_future"]):  # type: ignore[arg-type]
             raise ValueError("target and known-future names must be disjoint")
         observation_sha256 = sha256_json(record)
         selected_id = (
@@ -588,27 +588,124 @@ class OnlineCausalGraph:
             if observation_id is None
             else _name(observation_id, field="observation_id")
         )
+        return record, selected_id, observation_sha256
+
+    def observe_many(
+        self,
+        observations: Sequence[Mapping[str, object]],
+    ) -> tuple[GraphRevision, ...]:
+        """Append a validated temporal batch with one history reload and fsync."""
+
+        if isinstance(observations, (str, bytes)) or not isinstance(
+            observations, Sequence
+        ):
+            raise TypeError("observations must be a sequence of mappings")
+        if len(observations) > MAX_EVENTS:
+            raise ValueError("observation batch exceeds the event bound")
+        prepared: list[tuple[dict[str, object], str, str]] = []
+        fields = {
+            "covariates",
+            "known_future",
+            "observation_id",
+            "targets",
+            "timestamp_ns",
+        }
+        for raw in observations:
+            if (
+                not isinstance(raw, Mapping)
+                or not {
+                    "targets",
+                    "timestamp_ns",
+                }.issubset(raw)
+                or not set(raw).issubset(fields)
+            ):
+                raise ValueError("graph batch observation fields are invalid")
+            prepared.append(
+                self._prepare_observation(
+                    timestamp_ns=raw["timestamp_ns"],  # type: ignore[arg-type]
+                    targets=raw["targets"],  # type: ignore[arg-type]
+                    covariates=raw.get("covariates"),  # type: ignore[arg-type]
+                    known_future=raw.get("known_future"),  # type: ignore[arg-type]
+                    observation_id=raw.get("observation_id"),  # type: ignore[arg-type]
+                )
+            )
+        if not prepared:
+            return ()
+
         with self._lock, _graph_lock(self.root):
             self._reload_locked()
-            prior = self._observations.get(selected_id)
-            if prior is not None:
-                if prior != observation_sha256:
-                    raise CausalGraphConflictError(
-                        "observation_id is bound to different graph evidence"
+            last_timestamp = self._last_timestamp
+            pending: dict[str, str] = {}
+            append_flags: list[bool] = []
+            for record, selected_id, observation_sha256 in prepared:
+                prior = self._observations.get(selected_id, pending.get(selected_id))
+                if prior is not None:
+                    if prior != observation_sha256:
+                        raise CausalGraphConflictError(
+                            "observation_id is bound to different graph evidence"
+                        )
+                    append_flags.append(False)
+                    continue
+                timestamp = int(record["timestamp_ns"])
+                if timestamp <= last_timestamp:
+                    raise ValueError("timestamp_ns must increase strictly")
+                last_timestamp = timestamp
+                pending[selected_id] = observation_sha256
+                append_flags.append(True)
+
+            revisions: list[GraphRevision] = []
+            appended_any = False
+            try:
+                for should_append, prepared_row in zip(
+                    append_flags,
+                    prepared,
+                    strict=True,
+                ):
+                    record, selected_id, observation_sha256 = prepared_row
+                    if not should_append:
+                        revisions.append(
+                            GraphRevision(self._sequence, self._head, False)
+                        )
+                        continue
+                    digest = self._publish_locked(
+                        observation_id=selected_id,
+                        observation_sha256=observation_sha256,
+                        record=record,
+                        sync_directory=False,
                     )
-                return GraphRevision(self._sequence, self._head, False)
-            if record["timestamp_ns"] <= self._last_timestamp:
-                raise ValueError("timestamp_ns must increase strictly")
-            digest = self._publish_locked(
-                observation_id=selected_id,
-                observation_sha256=observation_sha256,
-                record=record,
+                    self._apply_record(record)
+                    self._sequence += 1
+                    self._head = digest
+                    self._observations[selected_id] = observation_sha256
+                    appended_any = True
+                    revisions.append(GraphRevision(self._sequence, self._head, True))
+            finally:
+                if appended_any:
+                    _fsync_directory(self.events)
+            return tuple(revisions)
+
+    def observe(
+        self,
+        *,
+        timestamp_ns: int,
+        targets: Mapping[str, float],
+        covariates: Mapping[str, float] | None = None,
+        known_future: Mapping[str, float] | None = None,
+        observation_id: str | None = None,
+    ) -> GraphRevision:
+        """Append one realized time step and update lag/intervention moments."""
+
+        return self.observe_many(
+            (
+                {
+                    "covariates": {} if covariates is None else covariates,
+                    "known_future": {} if known_future is None else known_future,
+                    "observation_id": observation_id,
+                    "targets": targets,
+                    "timestamp_ns": timestamp_ns,
+                },
             )
-            self._apply_record(record)
-            self._sequence += 1
-            self._head = digest
-            self._observations[selected_id] = observation_sha256
-            return GraphRevision(self._sequence, self._head, True)
+        )[0]
 
     def all_edges(self, *, target: str | None = None) -> tuple[CausalEdge, ...]:
         """Return every measured edge, including still-under-supported edges."""

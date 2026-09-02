@@ -9,7 +9,7 @@ from o1fm.action_bank import ActionBank
 from o1fm.baselines import SeasonalNaiveForecaster
 from o1fm.causal_graph import CausalEdge, CausalGraphConfig, OnlineCausalGraph
 from o1fm.conformal import O1ConformalField
-from o1fm.contracts import ForecastInputs, ForecastTarget
+from o1fm.contracts import ForecastInputs, ForecastPrediction, ForecastTarget
 from o1fm.crystals import ForecastCrystalBank
 from o1fm.features import extract_features, feature_schema
 from o1fm.metrics import score_prediction
@@ -129,6 +129,7 @@ def test_runtime_promotes_zero_forward_action_after_sequential_settlement(
     )
     inputs = _inputs()
     target = _target(inputs)
+    assert runtime.compile_teacher_crystals is False
     actions = []
     forwards = 0
     for _ in range(10):
@@ -269,3 +270,45 @@ def test_runtime_applies_and_settles_directed_conformal_field(tmp_path: Path) ->
     assert second.score.interval_coverage == 1.0
     assert second.base_score.interval_coverage == 0.0
     assert field.metrics()["settlements"] == 2
+
+
+class InjectedTeacher:
+    quantile_levels = KnownFutureModel().config.quantiles
+
+    def predict(self, inputs: ForecastInputs):
+        point = np.broadcast_to(
+            inputs.known_covariates[-inputs.horizon :, :1],
+            (inputs.horizon, inputs.target_dim),
+        ).copy()
+        offsets = np.linspace(-0.4, 0.4, len(self.quantile_levels), dtype=np.float32)
+        return ForecastPrediction(
+            series_id=inputs.series_id,
+            timestamps=inputs.future_timestamps,
+            point=point,
+            quantiles=point[..., None] + offsets,
+            quantile_levels=self.quantile_levels,
+        )
+
+
+def test_runtime_accepts_external_forecast_teacher(tmp_path: Path) -> None:
+    teacher = InjectedTeacher()
+    runtime = O1FMRuntime(
+        teacher,
+        model_identity="b" * 64,
+        o1=O1ErrorStream(tmp_path / "o1-teacher.json", stream_id="series-a"),
+        graph=OnlineCausalGraph(tmp_path / "graph-teacher", graph_id="series-a"),
+        crystals=ForecastCrystalBank(
+            tmp_path / "crystals-teacher.json",
+            quantile_levels=teacher.quantile_levels,
+        ),
+        actions=ActionBank(tmp_path / "actions-teacher.json"),
+        enable_seasonal=False,
+    )
+
+    ticket = runtime.forecast(_inputs())
+    settlement = runtime.settle(ticket, _target(_inputs()))
+
+    assert runtime.teacher is teacher
+    assert runtime.compile_teacher_crystals is True
+    assert ticket.action == "foundation"
+    assert settlement.score.mae == 0.0

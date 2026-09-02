@@ -24,3 +24,13 @@
   coverage, slightly improves pinball, and preserves the 50% forward reduction.
 - Added the end-to-end CLI proof: 6 of 12 foundation forwards replaced by
   Forecast Crystals, MAE 0.3411 → 0.2788, pinball 0.1335 → 0.1231.
+- Added lazy native/Toto-2/Chronos-2 teacher adapters and removed the runtime's
+  hard dependency on the native PyTorch forecaster.
+- Added a real Toto-2.0-22M control-plane receipt pinned to the loaded tensor
+  hash: 9 of 24 teacher forwards replaced under a 0.005 pinball gate, with
+  85.74% marginal and 87.5% joint coverage.
+- Batched causal-graph history append into one reload and directory sync per
+  forecast while preserving byte-identical event revisions and graph edges.
+- Added explicit Crystal fitting modes: native O1FM learns realized local
+  dynamics, while external teachers compile their raw trajectories; both keep
+  realized targets as residual, coverage and promotion authority.

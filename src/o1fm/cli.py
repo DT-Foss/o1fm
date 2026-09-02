@@ -8,6 +8,7 @@ from collections.abc import Sequence
 from pathlib import Path
 
 from .demo import run_demo
+from .open_teacher_demo import run_open_teacher_demo
 
 
 def build_parser() -> argparse.ArgumentParser:
@@ -25,19 +26,38 @@ def build_parser() -> argparse.ArgumentParser:
         action="store_true",
         help="disable the directed O1 conformal field",
     )
+    teacher = subcommands.add_parser(
+        "teacher-demo",
+        help="run a real open-weight teacher through O1FM",
+    )
+    teacher.add_argument("--teacher", choices=("toto2", "chronos2"), default="toto2")
+    teacher.add_argument("--checkpoint")
+    teacher.add_argument("--device", default="cpu")
+    teacher.add_argument("--seed", type=int, default=23)
+    teacher.add_argument("--state-dir")
+    teacher.add_argument("--output", help="optional JSON result path")
     return parser
 
 
 def main(argv: Sequence[str] | None = None) -> int:
     args = build_parser().parse_args(argv)
-    if args.command != "demo":  # pragma: no cover - argparse owns commands.
+    if args.command == "demo":
+        result = run_demo(
+            seed=args.seed,
+            epochs=args.epochs,
+            state_dir=args.state_dir,
+            enable_conformal=not args.no_conformal,
+        )
+    elif args.command == "teacher-demo":
+        result = run_open_teacher_demo(
+            teacher_name=args.teacher,
+            checkpoint=args.checkpoint,
+            device=args.device,
+            seed=args.seed,
+            state_dir=args.state_dir,
+        )
+    else:  # pragma: no cover - argparse owns commands.
         raise AssertionError("unsupported command")
-    result = run_demo(
-        seed=args.seed,
-        epochs=args.epochs,
-        state_dir=args.state_dir,
-        enable_conformal=not args.no_conformal,
-    )
     encoded = json.dumps(
         result,
         allow_nan=False,
