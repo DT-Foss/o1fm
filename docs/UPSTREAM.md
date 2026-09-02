@@ -27,6 +27,9 @@ the public README and documentation.
   https://huggingface.co/amazon/chronos-2
 
 O1FM imports neither package at startup and vendors no external weights. The
-adapters preserve O1FM's target/past-only/known-future roles, masks, horizon and
-nine-quantile output contract. Real execution receipts bind the adapter identity
-and a SHA-256 over the loaded state tensors.
+adapters publish an exact capability contract. Toto-2.0 preserves multivariate
+targets, historical covariates, masks, horizon and nine-quantile output; its
+published 2.0 release states that exogenous-variable support is planned for a
+future release. Chronos-2 additionally preserves known-future roles. Real
+execution receipts bind the adapter identity, capability record and a SHA-256
+over the loaded state tensors.

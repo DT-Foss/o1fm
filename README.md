@@ -108,8 +108,9 @@ SHA-256 `84149dcfc27a0125e123030b915d186e7c3962d13d9fc7f04887395e3faef0e5`.
 O1FM now runs a real Apache-2.0 Toto family through the common
 `ForecastTeacher` contract: 22M is the foundation authority and 4M is the
 continuous local authority. The receipt pins both loaded checkpoints by tensor
-SHA-256 and executes 24 non-overlapping multivariate windows with past-only and
-known-future covariates.
+SHA-256 and executes 24 non-overlapping multivariate windows. Toto consumes
+targets, past-only covariates and the historical prefix of known covariates;
+future exogenous schedules are reserved for a capability-compatible teacher.
 
 | Metric | Raw Toto-22M | Calibrated all-Toto control | Adaptive O1FM |
 |---|---:|---:|---:|
@@ -139,7 +140,7 @@ dominant control-plane latency without changing event hashes or graph edges.
 
 The committed receipt is
 [`results/o1fm-toto22m-control-plane-v1.json`](results/o1fm-toto22m-control-plane-v1.json),
-SHA-256 `0a0d20a6e2c77e3e533a1260168239ff8f81acb6b929c336e9684449d9e5cbaa`.
+SHA-256 `bd8e096d955cb6fef9928f22079380ecd1437cd68d46430831ebcda4f13caf35`.
 The loaded 22M and 4M tensors hash to
 `18b094801c589af0e6c9f900bf7f868541ce975712be9ac4a06d4529b647e4b2`
 and `41700039ffc479dbc93e79b69ca34adfb7343d15ad170a987537b7c72164508d`.
@@ -150,6 +151,37 @@ Settlement segments. Revision 72 verifies both before and after remount; every
 record resolves by `[segment_sha256, record_index]`. Atlas records bind route
 topology, route `W1`, prediction/calibration identities, O1 settlement and
 forward economics without storing raw targets or model weights.
+
+## Counterfactual cartography result
+
+O1FM now runs factual, graph-supported intervention and explicit hypothesis
+branches through a real Chronos-2 120M teacher. A paired structural world
+replays every branch from the same latent state, causal process and noise path,
+so an intervention is scored against its own realized trajectory rather than
+the factual labels.
+
+| Measurement | Result |
+|---|---:|
+| Candidate horizon/target/intervention cells | 36 |
+| D-optimal cells acquired and settled | 12 |
+| Physical Chronos-2 forwards | **3** |
+| Logical-to-physical forward reduction | **75%** |
+| Physical prediction payload | 74,991 bytes |
+| Cartography information gain | 75.3422 |
+| Atlas verification live / remounted | **true / true** |
+
+The run separates one factual path, one intervention supported by all three
+`known:0 -> target:*` edges, and one explicitly unsupported intervention-off
+hypothesis. It also exposes the next compiler target: Chronos-2 recovers only
+17.9% of the graph-supported structural effect magnitude and 1.24% of the
+previously unseen intervention effect, with both effect directions wrong on
+this world. O1FM now has the exact cells, route identities, oracle residuals and
+work accounting needed to compile those missing response surfaces into local
+operators instead of treating a foundation forecast as causal authority.
+
+The committed receipt is
+[`results/o1fm-chronos2-counterfactual-cartography-v1.json`](results/o1fm-chronos2-counterfactual-cartography-v1.json),
+SHA-256 `cfefc21c5a13f8f46e400443a6140a4f49c72714dd7d365f24de76a6a2dc83c0`.
 
 ## Relationship to TimesFM
 
@@ -184,6 +216,14 @@ Run the real Apache-2.0 Toto teacher path:
 python -m pip install -e '.[toto]'
 PYTHONPATH=/path/to/immer/src python -m o1fm teacher-demo \
   --teacher toto2 --atlas-dir artifacts/private/forecast-atlas.causal
+```
+
+Run the intervention-aware Cartographer with the covariate-capable teacher:
+
+```bash
+PYTHONPATH=/path/to/immer/src python -m o1fm cartography-demo \
+  --teacher chronos2 \
+  --atlas-dir artifacts/private/counterfactual-atlas.causal
 ```
 
 O1FM is developed by David Tom Foss.

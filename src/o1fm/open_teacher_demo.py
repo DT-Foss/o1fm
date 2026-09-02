@@ -460,6 +460,7 @@ def run_open_teacher_demo(
             if local_teacher is None
             else {
                 "adapter_identity_sha256": local_teacher.identity,  # type: ignore[attr-defined]
+                "capabilities": local_teacher.capabilities.to_record(),  # type: ignore[attr-defined]
                 "checkpoint": local_teacher.checkpoint,  # type: ignore[attr-defined]
                 "forward_cost": local_forward_cost,
                 "load_seconds": local_load_seconds,
@@ -478,6 +479,7 @@ def run_open_teacher_demo(
         ),
         "teacher": {
             "adapter_identity_sha256": teacher.identity,  # type: ignore[attr-defined]
+            "capabilities": teacher.capabilities.to_record(),  # type: ignore[attr-defined]
             "checkpoint": teacher.checkpoint,  # type: ignore[attr-defined]
             "load_seconds": load_seconds,
             "name": teacher_name,

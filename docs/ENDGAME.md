@@ -72,7 +72,9 @@ not the architecture.
 - **Toto 2.0 22M** is the foundation trajectory authority. Its Apache-2.0
   checkpoint is 84 MB, emits nine quantiles and alternates causal temporal with
   full variate attention. **Toto 2.0 4M** is the continuous local authority;
-  O1FM periodically refreshes it against 22M.
+  O1FM periodically refreshes it against 22M. The published 2.0 release does
+  not support future exogenous variables; its role is factual and local
+  trajectory authority, not intervention execution.
   [Official model family](https://huggingface.co/Datadog/Toto-2.0-22m)
 - **Chronos-2 120M** is the covariate teacher. It is Apache-2.0 and natively
   supports multivariate targets, past-only covariates and known-future
@@ -190,10 +192,13 @@ fallback for novelty. [DistilTS](https://arxiv.org/abs/2601.12785)
 
 1. Directed O1 Conformal Field with marginal and joint receipts.
 2. Toto-2.0-22M and Chronos-2 adapters behind one teacher protocol. **Running.**
-3. Factual and intervention-aware trajectory Crystals.
+3. Factual and intervention-aware trajectory branches. **Executing through
+   capability-routed teachers; response-surface Crystal compilation next.**
 4. `.causal` live Atlas records for routes, field revisions and compiled
    response surfaces. **Forecast/transport/settlement citations running.**
-5. O1 Cartographer jobs for autonomous horizon/target/action measurement.
+5. O1 Cartographer jobs for autonomous horizon/target/action/intervention
+   measurement. **Running with D-optimal acquisition and physical-forward
+   coalescing.**
 6. Battery policy for profitable idle-time branch charging.
 7. Markov/Seed policy learning over action, consequence, quality and work cost.
 8. Active value-of-information selection over sensors and interventions.
@@ -224,3 +229,25 @@ The same run commits 72 `.causal` segments. Forecast origin, prediction,
 normalized transport and settlement form a directly addressable evidence chain;
 the manifest and segments verify after a fresh remount. This is the first live
 substrate for the future counterfactual branch compiler.
+
+## First counterfactual cartography execution
+
+Chronos-2 120M now executes three aligned worlds from the same forecast origin:
+the factual schedule, a graph-supported seasonal-driver shift, and an explicit
+intervention-off hypothesis. `SyntheticStructuralState` replays each world with
+the identical latent state, exogenous causal process and sampled noise, so every
+branch has its own legitimate target.
+
+The Cartographer starts from 36 horizon × target-group × intervention cells.
+D-optimal acquisition selects 12; the execution bridge evaluates them with
+three physical forwards, a 75% reduction, while persisting exact work, payload,
+O1-shadow and result receipts. The `.causal` origin/transport/settlement chain
+verifies live and after remount.
+
+The measurement also identifies the next original O1FM operator. Chronos
+recovers 17.9% of the magnitude of the graph-supported effect and 1.24% of the
+unseen intervention effect, with the effect direction wrong in both cases.
+These are now named response-surface debts, not invisible teacher error. O1 can
+prioritize those cells and compile their settled residual field into an
+intervention Crystal, leaving Chronos as the trajectory prior and novelty
+fallback.

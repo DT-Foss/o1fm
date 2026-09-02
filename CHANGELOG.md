@@ -42,3 +42,27 @@
 - Added explicit Crystal fitting modes: native O1FM learns realized local
   dynamics, while external teachers compile their raw trajectories; both keep
   realized targets as residual, coverage and promotion authority.
+- Added replay-safe ActionBank and CrystalBank evidence identities, then added
+  a persistent SettlementLedger so growing partial horizons learn only newly
+  realized cells and crash replay cannot double-charge any control-plane state.
+- Added explicit factual, observed-policy, graph-supported and counterfactual
+  branches. Graph support now requires every edited source × declared target
+  intervention edge instead of promoting a whole multivariate branch from one
+  matching edge.
+- Added a real-teacher branch runtime and immutable teacher capability contract.
+  Toto-2.0 is correctly scoped to factual multivariate context; Chronos-2 and
+  native O1FM own known-future intervention execution.
+- Added the persistent Forecast Cartographer with O1 value priority, D-optimal
+  acquisition, graph-revision locality, exact work/byte budgets and a serial
+  nonblocking background runner.
+- Added a coalesced Cartography execution bridge: one physical branch forward
+  satisfies multiple horizon/target cells, exploratory evidence updates a
+  private shadow O1 stream, and intervention labels require an exact scenario
+  identity.
+- Added paired structural counterfactual replay with latent targets, complete
+  exogenous state, structural coefficients, regimes and the original sampled
+  noise path. The pre-existing factual corpus remains byte-identical.
+- Ran Chronos-2 120M across factual, graph-supported and hypothesis worlds. The
+  Cartographer settles 12 D-optimal cells with three physical forwards (75%
+  reduction) and exposes the exact intervention response surfaces the next
+  Crystal compiler must learn.

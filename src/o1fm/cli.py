@@ -7,6 +7,7 @@ import json
 from collections.abc import Sequence
 from pathlib import Path
 
+from .cartography_demo import run_cartography_demo
 from .demo import run_demo
 from .open_teacher_demo import run_open_teacher_demo
 
@@ -41,6 +42,20 @@ def build_parser() -> argparse.ArgumentParser:
     teacher.add_argument("--state-dir")
     teacher.add_argument("--atlas-dir")
     teacher.add_argument("--output", help="optional JSON result path")
+    cartography = subcommands.add_parser(
+        "cartography-demo",
+        help="run real branch cartography against paired counterfactual outcomes",
+    )
+    cartography.add_argument(
+        "--teacher", choices=("toto2", "chronos2"), default="chronos2"
+    )
+    cartography.add_argument("--checkpoint")
+    cartography.add_argument("--device", default="cpu")
+    cartography.add_argument("--seed", type=int, default=23)
+    cartography.add_argument("--state-dir")
+    cartography.add_argument("--atlas-dir", required=True)
+    cartography.add_argument("--selected-jobs", type=int, default=12)
+    cartography.add_argument("--output", help="optional JSON result path")
     return parser
 
 
@@ -65,6 +80,16 @@ def main(argv: Sequence[str] | None = None) -> int:
             coverage_tolerance=args.coverage_tolerance,
             state_dir=args.state_dir,
             atlas_dir=args.atlas_dir,
+        )
+    elif args.command == "cartography-demo":
+        result = run_cartography_demo(
+            teacher_name=args.teacher,
+            checkpoint=args.checkpoint,
+            atlas_dir=args.atlas_dir,
+            device=args.device,
+            seed=args.seed,
+            state_dir=args.state_dir,
+            selected_jobs=args.selected_jobs,
         )
     else:  # pragma: no cover - argparse owns commands.
         raise AssertionError("unsupported command")

@@ -18,6 +18,11 @@ from .attention import (
     sinkhorn_transport,
 )
 from .baselines import SeasonalNaiveForecaster
+from .branch_runtime import (
+    TeacherBranchProvenance,
+    TeacherBranchProvenanceProvider,
+    TeacherBranchRuntime,
+)
 from .branches import (
     BranchExecutionResult,
     BranchExecutor,
@@ -32,11 +37,6 @@ from .branches import (
     TrajectoryExtremes,
     apply_intervention,
 )
-from .branch_runtime import (
-    TeacherBranchProvenance,
-    TeacherBranchProvenanceProvider,
-    TeacherBranchRuntime,
-)
 from .cartography import (
     BackgroundRun,
     CartographerBudgets,
@@ -50,6 +50,20 @@ from .cartography import (
     ProbeEvidence,
     ProbePriority,
     ProbeReceipt,
+)
+from .cartography_demo import run_cartography_demo
+from .cartography_runtime import (
+    CartographyExecutionBridge,
+    CartographyExecutionBudgetError,
+    CartographyExecutionContractError,
+    CartographyExecutionError,
+    CartographyProbeNotReadyError,
+    CoalescedProbeBatch,
+    MeasuredBranchExecution,
+    ProbeWindow,
+    ShadowProbeLedger,
+    ShadowProbeUpdate,
+    execution_key,
 )
 from .causal_graph import CausalEdge, CausalGraphConfig, OnlineCausalGraph
 from .conformal import (
@@ -93,11 +107,13 @@ from .synthetic import (
     SyntheticConfig,
     SyntheticDataset,
     SyntheticSeries,
+    SyntheticStructuralState,
     generate_synthetic_dataset,
 )
 from .teachers import (
     Chronos2Teacher,
     ForecastTeacher,
+    ForecastTeacherCapabilities,
     NativeO1FMTeacher,
     Toto2Teacher,
     teacher_identity,
@@ -132,8 +148,14 @@ __all__ = [
     "CartographerBudgets",
     "CartographerConfig",
     "CartographyBudgetError",
+    "CartographyExecutionBridge",
+    "CartographyExecutionBudgetError",
+    "CartographyExecutionContractError",
+    "CartographyExecutionError",
     "CartographyError",
     "CartographyIntegrityError",
+    "CartographyProbeNotReadyError",
+    "CoalescedProbeBatch",
     "ConformalApplication",
     "ConformalConflictError",
     "ConformalFieldConfig",
@@ -162,6 +184,7 @@ __all__ = [
     "ForecastTarget",
     "ForecastTargets",
     "ForecastTeacher",
+    "ForecastTeacherCapabilities",
     "ForecastTicket",
     "IdentificationStatus",
     "InterventionOperation",
@@ -175,12 +198,14 @@ __all__ = [
     "O1FMRuntime",
     "O1ConformalField",
     "NativeO1FMTeacher",
+    "MeasuredBranchExecution",
     "O1State",
     "OnlineCausalGraph",
     "ProbeConflictError",
     "ProbeEvidence",
     "ProbePriority",
     "ProbeReceipt",
+    "ProbeWindow",
     "RMSNorm",
     "RouteTransportResult",
     "SeasonalNaiveForecaster",
@@ -189,6 +214,7 @@ __all__ = [
     "SyntheticConfig",
     "SyntheticDataset",
     "SyntheticSeries",
+    "SyntheticStructuralState",
     "TemporalSelfAttention",
     "TargetTrajectory",
     "TeacherBranchProvenance",
@@ -201,11 +227,14 @@ __all__ = [
     "SettlementIntegrityError",
     "SettlementLedger",
     "SettlementLedgerError",
+    "ShadowProbeLedger",
+    "ShadowProbeUpdate",
     "apply_intervention",
     "canonical_json_bytes",
     "causal_transport_stack",
     "causal_transport_w1",
     "extract_features",
+    "execution_key",
     "feature_schema",
     "forecast_loss",
     "generate_synthetic_dataset",
@@ -217,6 +246,7 @@ __all__ = [
     "revin",
     "route_transport_w1",
     "run_open_teacher_demo",
+    "run_cartography_demo",
     "score_prediction",
     "sha256_json",
     "sinkhorn_transport",

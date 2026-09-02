@@ -46,11 +46,18 @@ class. Native O1FM, Toto-2 and Chronos-2 all consume `ForecastInputs` and return
 the identical immutable `ForecastPrediction` contract. External packages load
 lazily and remain optional. Teacher identities bind adapter, checkpoint and
 quantile inventory; executable receipts additionally hash the loaded tensors.
+An immutable capability contract declares multiple-target, past-covariate,
+known-future-covariate and probabilistic support. The branch runtime requires
+that record before assigning intervention work; it is also available to
+capability-aware ActionBank routing.
 
-Toto-2 maps targets and past-only covariates into historical variates and maps
-known-future channels through its dynamic-covariate input. Chronos-2 receives the
-same roles through its official list-of-dictionaries API. Everything after the
-teacher call—Conformal Field, O1, Graph, Crystals and ActionBank—is shared.
+Toto-2.0 maps targets, past-only covariates and the historical prefix of known
+covariates into multivariate context. Its published 2.0 release does not support
+future exogenous variables, so it is factual/local authority and cannot execute
+an intervention branch. Chronos-2 receives past and future covariate roles
+through its official list-of-dictionaries API and is the current intervention
+teacher. Everything after the teacher call—Conformal Field, O1, Graph, Crystals
+and ActionBank—is shared.
 An optional local teacher is evaluated as a priced candidate. ActionBank can
 select it only after profile-local quality and coverage settlement. A bounded
 local streak forces a foundation refresh, renewing authority, calibration and
@@ -213,3 +220,36 @@ net(action) = avoided_foundation_cost
 
 Unknown contexts fall through to the foundation predictor. A cheap action is
 never allowed to become its own quality authority.
+
+## Exactly-once incremental settlement
+
+Realized horizons may arrive cell by cell. `SettlementLedger` stores the
+already-observed mask and value union per forecast ticket. Every request yields
+only its previously unseen cells and one content-derived fragment identity.
+O1, Conformal, Crystal and ActionBank consume that same fragment identity.
+
+The ledger commits only after every consumer and the Atlas succeed. A crash
+before commit therefore replays the identical fragment through idempotent
+consumers; a growing cumulative target learns only the new suffix; changing an
+already observed value is a hard conflict. Settlement Atlas v2 records the
+fragment hash and observed-value count directly.
+
+## Executable branch cartography
+
+`TeacherBranchRuntime` executes factual and future-known intervention inputs
+through any capability-compatible teacher. `BranchExecutor` classifies a branch
+as graph-supported only when lag-zero intervention evidence covers the complete
+Cartesian set of edited sources × declared targets. Partial support remains an
+explicit counterfactual hypothesis.
+
+`ForecastCartographer` maintains the persistent measurement frontier. Its
+execution bridge coalesces target and horizon cells that share one physical
+model execution, allocates measured work and payload bytes exactly once, and
+updates only a private shadow O1 stream. Live forecast authority is never
+advanced by exploratory probes.
+
+The synthetic world retains its latent target, exogenous process, structural
+weights, regimes and exact sampled noise. `counterfactual_target()` replays an
+edited known-future schedule from the same origin and noise path. This gives
+every simulated intervention its own realized labels without putting future
+targets into `ForecastInputs`.
