@@ -122,6 +122,124 @@ class SyntheticConfig:
 
 
 @dataclass(frozen=True, slots=True)
+class SyntheticStructuralState:
+    """Immutable exogenous state for paired structural replay.
+
+    The state retains the unmasked latent target, the complete causal process,
+    every coefficient used by the structural equations, and the exact sampled
+    noise path.  None of these channels is exposed through ``ForecastInputs``.
+    """
+
+    latent_target: NDArray[np.float64]
+    causal_process: NDArray[np.float64]
+    transition_matrices: tuple[NDArray[np.float64], ...]
+    causal_weights: NDArray[np.float64]
+    season_weights: NDArray[np.float64]
+    intervention_effect: NDArray[np.float64]
+    regime_offsets: NDArray[np.float64]
+    noise: NDArray[np.float64]
+    regime_ids: NDArray[np.int8]
+    series_offset: float
+
+    def __post_init__(self) -> None:
+        latent = np.array(self.latent_target, dtype=np.float64, copy=True, order="C")
+        causal = np.array(
+            self.causal_process,
+            dtype=np.float64,
+            copy=True,
+            order="C",
+        )
+        noise = np.array(self.noise, dtype=np.float64, copy=True, order="C")
+        regimes = np.array(self.regime_ids, dtype=np.int8, copy=True, order="C")
+        if latent.ndim != 2 or latent.shape[0] < 1 or latent.shape[1] < 2:
+            raise ValueError("latent_target must be a non-empty multivariate matrix")
+        steps, target_dim = latent.shape
+        if causal.ndim != 2 or causal.shape[0] != steps or causal.shape[1] < 1:
+            raise ValueError("causal_process must align with latent_target")
+        if noise.shape != latent.shape or regimes.shape != (steps,):
+            raise ValueError("noise and regimes must align with latent_target")
+        transitions = tuple(
+            np.array(value, dtype=np.float64, copy=True, order="C")
+            for value in self.transition_matrices
+        )
+        if len(transitions) != 3 or any(
+            value.shape != (target_dim, target_dim) for value in transitions
+        ):
+            raise ValueError("three square transition matrices are required")
+        causal_weights = np.array(
+            self.causal_weights,
+            dtype=np.float64,
+            copy=True,
+            order="C",
+        )
+        season_weights = np.array(
+            self.season_weights,
+            dtype=np.float64,
+            copy=True,
+            order="C",
+        )
+        intervention_effect = np.array(
+            self.intervention_effect,
+            dtype=np.float64,
+            copy=True,
+            order="C",
+        )
+        regime_offsets = np.array(
+            self.regime_offsets,
+            dtype=np.float64,
+            copy=True,
+            order="C",
+        )
+        if causal_weights.shape != (target_dim, causal.shape[1]):
+            raise ValueError("causal_weights do not match the structural state")
+        if season_weights.shape != (target_dim, 2):
+            raise ValueError("season_weights must map two seasonal channels")
+        if intervention_effect.shape != (target_dim,):
+            raise ValueError("intervention_effect must contain one value per target")
+        if regime_offsets.shape != (3, target_dim):
+            raise ValueError("regime_offsets must contain three target vectors")
+        values = (
+            latent,
+            causal,
+            noise,
+            *transitions,
+            causal_weights,
+            season_weights,
+            intervention_effect,
+            regime_offsets,
+        )
+        if not all(bool(np.isfinite(value).all()) for value in values):
+            raise ValueError("structural state must be finite")
+        if not bool(np.isin(regimes, (0, 1, 2)).all()):
+            raise ValueError("structural regimes must be 0, 1, or 2")
+        series_offset = float(self.series_offset)
+        if not math.isfinite(series_offset):
+            raise ValueError("series_offset must be finite")
+        object.__setattr__(self, "latent_target", _readonly(latent))
+        object.__setattr__(self, "causal_process", _readonly(causal))
+        object.__setattr__(
+            self,
+            "transition_matrices",
+            tuple(_readonly(value) for value in transitions),
+        )
+        object.__setattr__(self, "causal_weights", _readonly(causal_weights))
+        object.__setattr__(self, "season_weights", _readonly(season_weights))
+        object.__setattr__(
+            self,
+            "intervention_effect",
+            _readonly(intervention_effect),
+        )
+        object.__setattr__(self, "regime_offsets", _readonly(regime_offsets))
+        object.__setattr__(self, "noise", _readonly(noise))
+        object.__setattr__(self, "regime_ids", _readonly(regimes))
+        object.__setattr__(
+            self,
+            "series_offset",
+            0.0 if series_offset == 0.0 else series_offset,
+        )
+
+
+@dataclass(frozen=True, slots=True)
 class SyntheticSeries:
     """One complete latent series plus observation masks and regime labels."""
 
@@ -134,6 +252,7 @@ class SyntheticSeries:
     known_covariates: NDArray[np.float32]
     known_covariate_mask: NDArray[np.bool_]
     regime_ids: NDArray[np.int8]
+    structural_state: SyntheticStructuralState
 
     def __post_init__(self) -> None:
         if not isinstance(self.series_id, str) or not self.series_id:
@@ -176,6 +295,7 @@ class SyntheticSeries:
             order="C",
         )
         regimes = np.array(self.regime_ids, dtype=np.int8, copy=True, order="C")
+        state = self.structural_state
         steps = int(target.shape[0]) if target.ndim == 2 else -1
         if (
             steps < 1
@@ -199,9 +319,27 @@ class SyntheticSeries:
             raise ValueError("synthetic timestamps must be strictly increasing")
         if not np.isin(regimes, (0, 1, 2)).all():
             raise ValueError("synthetic regime IDs must be 0, 1, or 2")
+        if not isinstance(state, SyntheticStructuralState):
+            raise TypeError("structural_state must be SyntheticStructuralState")
         target[~target_mask] = 0.0
         past[~past_mask] = 0.0
         known[~known_mask] = 0.0
+        if (
+            state.latent_target.shape != target.shape
+            or state.causal_process.shape != past.shape
+            or state.regime_ids.shape != regimes.shape
+        ):
+            raise ValueError("structural state does not align with observed series")
+        latent_target = state.latent_target.astype(np.float32)
+        latent_target[~target_mask] = 0.0
+        latent_causal = state.causal_process.astype(np.float32)
+        latent_causal[~past_mask] = 0.0
+        if (
+            not np.array_equal(latent_target, target)
+            or not np.array_equal(latent_causal, past)
+            or not np.array_equal(state.regime_ids, regimes)
+        ):
+            raise ValueError("observed series does not match its structural state")
         object.__setattr__(self, "timestamps", _readonly(timestamps))
         object.__setattr__(self, "target", _readonly(target))
         object.__setattr__(self, "target_mask", _readonly(target_mask))
@@ -258,6 +396,103 @@ class SyntheticDataset:
     @property
     def known_covariate_dim(self) -> int:
         return 4
+
+    def counterfactual_target(self, inputs: ForecastInputs) -> ForecastTarget:
+        """Realize one paired future on the world's original exogenous path.
+
+        Only known-future values may differ from the factual series.  Historical
+        targets, causal covariates, known covariates, masks, and timestamps must
+        still identify an exact window in this dataset.
+        """
+
+        if not isinstance(inputs, ForecastInputs):
+            raise TypeError("inputs must be ForecastInputs")
+        matches = tuple(row for row in self.series if row.series_id == inputs.series_id)
+        if len(matches) != 1:
+            raise KeyError("inputs series_id is absent from the synthetic world")
+        series = matches[0]
+        series_ticks = series.timestamps.astype(np.int64, copy=False)
+        input_ticks = inputs.timestamps.astype(np.int64, copy=False)
+        history_start = int(np.searchsorted(series_ticks, input_ticks[0]))
+        history_end = history_start + inputs.history_length
+        future_end = history_end + inputs.horizon
+        if (
+            history_start < 0
+            or future_end > series_ticks.size
+            or not np.array_equal(
+                series_ticks[history_start:future_end],
+                input_ticks,
+            )
+        ):
+            raise ValueError("inputs timestamps do not identify an exact world window")
+        if (
+            inputs.target_dim != self.target_dim
+            or inputs.past_covariate_dim != self.config.past_covariate_dim
+            or inputs.known_covariate_dim != self.known_covariate_dim
+        ):
+            raise ValueError("inputs dimensions do not match the synthetic world")
+        historical_pairs = (
+            (inputs.past_target, series.target[history_start:history_end]),
+            (
+                inputs.past_target_mask,
+                series.target_mask[history_start:history_end],
+            ),
+            (
+                inputs.past_covariates,
+                series.past_covariates[history_start:history_end],
+            ),
+            (
+                inputs.past_covariate_mask,
+                series.past_covariate_mask[history_start:history_end],
+            ),
+            (
+                inputs.known_covariates[: inputs.history_length],
+                series.known_covariates[history_start:history_end],
+            ),
+            (
+                inputs.known_covariate_mask[: inputs.history_length],
+                series.known_covariate_mask[history_start:history_end],
+            ),
+        )
+        if any(not np.array_equal(left, right) for left, right in historical_pairs):
+            raise ValueError("only known-future covariates may differ from the world")
+        future_known = inputs.known_covariates[inputs.history_length :]
+        future_known_mask = inputs.known_covariate_mask[inputs.history_length :]
+        if not bool(future_known_mask.all()):
+            raise ValueError(
+                "counterfactual known-future schedule must be fully observed"
+            )
+
+        state = series.structural_state
+        realized = np.empty((inputs.horizon, self.target_dim), dtype=np.float64)
+        previous = state.latent_target[history_end - 1]
+        for local_index in range(inputs.horizon):
+            world_index = history_end + local_index
+            regime = int(state.regime_ids[world_index])
+            previous_causal = state.causal_process[world_index - 1]
+            known = future_known[local_index]
+            seasonal = state.season_weights @ known[:2].astype(np.float64)
+            intervention = state.intervention_effect * float(known[2])
+            current = (
+                state.transition_matrices[regime] @ previous
+                + state.causal_weights @ previous_causal
+                + seasonal
+                + intervention
+                + state.regime_offsets[regime]
+                + state.series_offset
+                + state.noise[world_index]
+            )
+            realized[local_index] = current
+            previous = current
+        target_mask = series.target_mask[history_end:future_end]
+        values = realized.astype(np.float32)
+        values[~target_mask] = 0.0
+        return ForecastTarget(
+            series_id=series.series_id,
+            timestamps=series.timestamps[history_end:future_end],
+            values=values,
+            mask=target_mask,
+        )
 
 
 def _timestamps(config: SyntheticConfig) -> NDArray[np.datetime64]:
@@ -326,6 +561,7 @@ def _make_series(
         )
     )
     target = np.zeros((steps, target_dim), dtype=np.float64)
+    noise_path = np.empty((steps, target_dim), dtype=np.float64)
     series_offset = (ordinal - (config.n_series - 1) / 2.0) * 0.08
     for index in range(steps):
         regime = int(regimes[index])
@@ -334,6 +570,7 @@ def _make_series(
         seasonal = season_weights @ known[index, :2].astype(np.float64)
         intervention = intervention_effect * float(known[index, 2])
         noise = rng.normal(0.0, config.noise_scale, size=target_dim)
+        noise_path[index] = noise
         target[index] = (
             transitions[regime] @ previous_target
             + causal_weights @ previous_causal
@@ -363,6 +600,18 @@ def _make_series(
         known_covariates=known,
         known_covariate_mask=known_mask,
         regime_ids=regimes,
+        structural_state=SyntheticStructuralState(
+            latent_target=target,
+            causal_process=causal,
+            transition_matrices=transitions,
+            causal_weights=causal_weights,
+            season_weights=season_weights,
+            intervention_effect=intervention_effect,
+            regime_offsets=regime_offsets,
+            noise=noise_path,
+            regime_ids=regimes,
+            series_offset=series_offset,
+        ),
     )
 
 
@@ -450,6 +699,7 @@ __all__ = [
     "SyntheticConfig",
     "SyntheticDataset",
     "SyntheticSeries",
+    "SyntheticStructuralState",
     "generate_synthetic_dataset",
     "make_synthetic_dataset",
 ]
