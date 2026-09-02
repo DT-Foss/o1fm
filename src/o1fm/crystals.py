@@ -679,9 +679,7 @@ class ForecastCrystalBank:
             upper = quantiles_before[max(quantiles_before)]
             state.covered_values += int(
                 np.count_nonzero(
-                    observed_flat
-                    & (target_flat >= lower)
-                    & (target_flat <= upper)
+                    observed_flat & (target_flat >= lower) & (target_flat <= upper)
                 )
             )
             state.observed_values += observed_count

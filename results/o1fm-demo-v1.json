@@ -57,7 +57,7 @@
     "cusum": 0.0,
     "ew_absolute_error": 0.31215608502332554,
     "ew_normalized_error": 1.3360040343813249,
-    "head_event_sha256": "ce580fadb9aead4ff04315d09141d6295f963161e00094c63b53edacaf0f5b5f",
+    "head_event_sha256": "59637efbcc737999081cad5a591a7c17021bc389733a540208421e25fee6a542",
     "identity_sha256": "57207296ab2ed98dbbe59e681fd713ead04695cdac0ceee884685ad70101f247",
     "interval_coverage": 0.5763888888888888,
     "learning_progress": 0.0,
@@ -85,8 +85,8 @@
   },
   "schema": "o1fm.demo-result/v1",
   "timing": {
-    "runtime_seconds": 7.903200583998114,
-    "training_seconds": 2.922303459024988
+    "runtime_seconds": 7.865582749946043,
+    "training_seconds": 2.8698162079090253
   },
   "training": {
     "best_loss": 0.09576303698122501,

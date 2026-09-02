@@ -33,8 +33,9 @@ multivariate history + known future covariates
   head predicts the full horizon and ordered quantiles in one forward pass.
 - **Forecasting-native O1 state.** Every realized target updates normalized
   residuals, coverage, learning progress, surprise, and regime identity.
-- **Causal covariate routing.** Online lagged influence scores select the target,
-  past-only covariates, and known-future signals that carry the current regime.
+- **Causal covariate routing.** Online lagged influence scores select past-only
+  and known-future signals. Topology hysteresis accepts real route changes while
+  ignoring one-window score jitter.
 - **Forecast Crystals.** Verified regimes charge compact ridge kernels that can
   release future forecasts without another foundation forward.
 - **Economic execution.** The Action Bank selects the cheapest action that has
@@ -58,15 +59,15 @@ multivariate stream. It trains on 60 windows, then settles 12 future windows of
 The runtime removed 50% of foundation forwards while improving both point and
 probabilistic error on this stream. The live graph accumulated 72 lagged edges,
 55 reached routing support, and O1 settled 432 realized target values. This is
-a synthetic architecture proof, not a claim against public forecasting
-benchmarks. The exact result is produced by:
+the committed architecture proof; public benchmark integration is the next
+stage. The exact result is produced by:
 
 ```bash
 python -m o1fm demo
 ```
 
 The committed receipt is [`results/o1fm-demo-v1.json`](results/o1fm-demo-v1.json),
-SHA-256 `8b15f5bf591937b1badb62c523ca07ef37bd9b5c5bbb455a46abe1d0c1d8c7f6`.
+SHA-256 `f150251bb0a1dab3cb4512f9803d9cb1a608694967d9778b1f759349800c2c85`.
 
 ## Relationship to TimesFM
 

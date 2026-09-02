@@ -102,10 +102,12 @@ the strongest stable incoming edges per target and records an append-only graph
 revision. The graph never fabricates causality from a name; every edge is tied
 to settled temporal evidence.
 
-The routed feature topology is fixed for one O1 regime generation. Graph
-moments continue to update underneath it; an O1 regime change reopens routing
-and creates a new Crystal/Action profile. This prevents ordinary score jitter
-from fragmenting stored compute while keeping real regime changes explicit.
+Every forecast recomputes the candidate topology. An unchanged topology
+refreshes live edge scores immediately. A changed topology becomes active after
+three consecutive candidate observations; an O1 regime change starts a fresh
+route state immediately. The exact `(source, target, lag, kind)` tuples form the
+graph identity used by Crystals and Action profiles. This keeps routing online
+without fragmenting stored compute on one-window score jitter.
 
 ## Forecast Crystals
 
@@ -123,7 +125,9 @@ W  = (G + lambda I)^-1 B
 Residual quantiles supply uncertainty. A Crystal becomes executable when its
 sequential support, error, bias, and interval coverage satisfy its promotion
 contract. Regime or graph changes select another Crystal rather than mutating a
-foreign one.
+foreign one. Partial settlements update every observed horizon cell immediately;
+unobserved cells use the Crystal's pre-update point as a neutral training value
+and never enter error or coverage totals.
 
 ## Economic Action Bank
 

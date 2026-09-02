@@ -7,14 +7,14 @@ import torch
 
 from o1fm.action_bank import ActionBank
 from o1fm.baselines import SeasonalNaiveForecaster
-from o1fm.causal_graph import CausalGraphConfig, OnlineCausalGraph
+from o1fm.causal_graph import CausalEdge, CausalGraphConfig, OnlineCausalGraph
 from o1fm.contracts import ForecastInputs, ForecastTarget
 from o1fm.crystals import ForecastCrystalBank
 from o1fm.features import extract_features, feature_schema
 from o1fm.metrics import score_prediction
 from o1fm.model import ForecastResult, O1FMConfig, O1FMForecaster
 from o1fm.o1 import O1Config, O1ErrorStream
-from o1fm.runtime import O1FMRuntime
+from o1fm.runtime import O1FMRuntime, RouteSelection
 from o1fm.training import tensorize_inputs
 
 
@@ -140,3 +140,89 @@ def test_runtime_promotes_zero_forward_action_after_sequential_settlement(
     assert "crystal" in actions
     assert forwards < len(actions)
     assert runtime.o1.state.observations == len(actions)
+
+
+def _edge(*, lag: int, score: float, revision: str = "b" * 64) -> CausalEdge:
+    return CausalEdge(
+        source="past:0",
+        target="target:0",
+        lag=lag,
+        kind="observational",
+        observations=8,
+        covariance=score,
+        source_variance=1.0,
+        target_variance=1.0,
+        score=score,
+        revision_sha256=revision,
+    )
+
+
+def _runtime_for_routing(tmp_path: Path, *, route_stability: int = 2) -> O1FMRuntime:
+    model = KnownFutureModel()
+    return O1FMRuntime(
+        model,
+        model_identity="a" * 64,
+        o1=O1ErrorStream(tmp_path / "o1-routing.json", stream_id="series-a"),
+        graph=OnlineCausalGraph(tmp_path / "graph-routing", graph_id="series-a"),
+        crystals=ForecastCrystalBank(
+            tmp_path / "crystals-routing.json",
+            quantile_levels=model.config.quantiles,
+        ),
+        actions=ActionBank(tmp_path / "actions-routing.json"),
+        route_stability=route_stability,
+    )
+
+
+def test_route_identity_contains_edge_topology(tmp_path: Path) -> None:
+    runtime = _runtime_for_routing(tmp_path)
+    runtime.graph.route = lambda _target, top_k=None: (_edge(lag=1, score=0.7),)  # type: ignore[method-assign]
+    first = runtime._route_candidate(_inputs())
+    runtime.graph.route = lambda _target, top_k=None: (_edge(lag=2, score=0.7),)  # type: ignore[method-assign]
+    second = runtime._route_candidate(_inputs())
+
+    assert first.past_indices == second.past_indices == (0,)
+    assert first.signature_sha256 != second.signature_sha256
+
+
+def test_route_hysteresis_refreshes_scores_and_promotes_stable_topology(
+    tmp_path: Path,
+) -> None:
+    runtime = _runtime_for_routing(tmp_path, route_stability=2)
+    initial = RouteSelection((0,), (0,), "1" * 64, (_edge(lag=1, score=0.2),))
+    refreshed = RouteSelection(
+        (0,),
+        (0,),
+        initial.signature_sha256,
+        (_edge(lag=1, score=0.9, revision="c" * 64),),
+    )
+    changed = RouteSelection((0,), (0,), "2" * 64, (_edge(lag=2, score=0.8),))
+    candidates = iter((initial, refreshed, changed, changed))
+    runtime._observe_graph_history = lambda _inputs: None  # type: ignore[method-assign]
+    runtime._route_candidate = lambda _inputs: next(candidates)  # type: ignore[method-assign]
+
+    assert runtime._route(_inputs(), regime="regime:0") is initial
+    assert runtime._route(_inputs(), regime="regime:0").edges[0].score == 0.9
+    assert runtime._route(_inputs(), regime="regime:0").signature_sha256 == "1" * 64
+    assert runtime._route(_inputs(), regime="regime:0") is changed
+
+
+def test_runtime_trains_crystal_from_partial_settlement(tmp_path: Path) -> None:
+    runtime = _runtime_for_routing(tmp_path)
+    inputs = _inputs()
+    mask = np.zeros((inputs.horizon, inputs.target_dim), dtype=np.bool_)
+    mask[0, 0] = True
+    target = ForecastTarget(
+        series_id=inputs.series_id,
+        timestamps=inputs.future_timestamps,
+        values=np.full((inputs.horizon, inputs.target_dim), 3.0, np.float32),
+        mask=mask,
+    )
+
+    ticket = runtime.forecast(inputs)
+    settlement = runtime.settle(ticket, target)
+    stats = runtime.crystals.describe(ticket.crystal_key)
+
+    assert settlement.score.observed_values == 1
+    assert runtime.o1.metrics()["value_count"] == 1
+    assert stats is not None
+    assert stats.support == 1

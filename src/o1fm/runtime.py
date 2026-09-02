@@ -30,6 +30,13 @@ class RouteSelection:
     edges: tuple[CausalEdge, ...]
 
 
+@dataclass(slots=True)
+class _RouteState:
+    active: RouteSelection
+    pending: RouteSelection | None = None
+    pending_support: int = 0
+
+
 @dataclass(frozen=True, slots=True)
 class ForecastTicket:
     ticket_id: str
@@ -86,6 +93,7 @@ class O1FMRuntime:
         actions: ActionBank,
         seasonal_period: int = 24,
         route_top_k: int = 8,
+        route_stability: int = 3,
         enable_seasonal: bool = True,
         device: str = "cpu",
     ) -> None:
@@ -93,7 +101,13 @@ class O1FMRuntime:
             raise TypeError("model must be O1FMForecaster")
         if not isinstance(model_identity, str) or len(model_identity) != 64:
             raise ValueError("model_identity must be a SHA-256 digest")
-        if seasonal_period <= 0 or route_top_k <= 0:
+        if (
+            seasonal_period <= 0
+            or route_top_k <= 0
+            or isinstance(route_stability, bool)
+            or not isinstance(route_stability, int)
+            or route_stability <= 0
+        ):
             raise ValueError("runtime routing controls must be positive")
         if not isinstance(enable_seasonal, bool):
             raise TypeError("enable_seasonal must be boolean")
@@ -111,10 +125,11 @@ class O1FMRuntime:
         )
         self.seasonal_period = seasonal_period
         self.route_top_k = route_top_k
+        self.route_stability = route_stability
         self.enable_seasonal = enable_seasonal
         self.device = device
         self._sequence = 0
-        self._routes_by_regime: dict[str, RouteSelection] = {}
+        self._routes_by_regime: dict[str, _RouteState] = {}
 
     @staticmethod
     def _target_name(index: int) -> str:
@@ -155,11 +170,7 @@ class O1FMRuntime:
                 observation_id=f"obs:{inputs.series_id}:{int(timestamp.astype(np.int64))}",
             )
 
-    def _route(self, inputs: ForecastInputs, *, regime: str) -> RouteSelection:
-        self._observe_graph_history(inputs)
-        cached = self._routes_by_regime.get(regime)
-        if cached is not None:
-            return cached
+    def _route_candidate(self, inputs: ForecastInputs) -> RouteSelection:
         edges: list[CausalEdge] = []
         for target in range(inputs.target_dim):
             edges.extend(
@@ -193,14 +204,51 @@ class O1FMRuntime:
             known = tuple(range(inputs.known_covariate_dim))
         signature = sha256_json(
             {
+                "edges": [
+                    {
+                        "kind": edge.kind,
+                        "lag": edge.lag,
+                        "source": edge.source,
+                        "target": edge.target,
+                    }
+                    for edge in ordered
+                ],
                 "known": list(known),
                 "past": list(past),
                 "schema": "o1fm.routed-feature-topology/v1",
             }
         )
-        selection = RouteSelection(past, known, signature, ordered)
-        self._routes_by_regime[regime] = selection
-        return selection
+        return RouteSelection(past, known, signature, ordered)
+
+    def _route(self, inputs: ForecastInputs, *, regime: str) -> RouteSelection:
+        self._observe_graph_history(inputs)
+        candidate = self._route_candidate(inputs)
+        state = self._routes_by_regime.get(regime)
+        if state is None:
+            self._routes_by_regime[regime] = _RouteState(active=candidate)
+            return candidate
+
+        if candidate.signature_sha256 == state.active.signature_sha256:
+            state.active = candidate
+            state.pending = None
+            state.pending_support = 0
+            return candidate
+
+        if (
+            state.pending is None
+            or state.pending.signature_sha256 != candidate.signature_sha256
+        ):
+            state.pending = candidate
+            state.pending_support = 1
+        else:
+            state.pending = candidate
+            state.pending_support += 1
+
+        if state.pending_support >= self.route_stability:
+            state.active = candidate
+            state.pending = None
+            state.pending_support = 0
+        return state.active
 
     def forecast(self, inputs: ForecastInputs) -> ForecastTicket:
         if not isinstance(inputs, ForecastInputs):
@@ -331,14 +379,13 @@ class O1FMRuntime:
             mask=target.mask,
             observation_id=f"ticket:{ticket.ticket_id}",
         )
-        crystal_stats = self.crystals.describe(ticket.crystal_key)
-        if bool(target.mask.all()):
-            crystal_stats = self.crystals.observe(
-                ticket.crystal_key,
-                ticket.features,
-                target.values,
-                regime=ticket.regime,
-            )
+        crystal_stats = self.crystals.observe(
+            ticket.crystal_key,
+            ticket.features,
+            target.values,
+            future_target_mask=target.mask,
+            regime=ticket.regime,
+        )
 
         settled_actions: set[str] = set()
 
