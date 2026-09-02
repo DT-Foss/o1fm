@@ -1,0 +1,486 @@
+{
+  "atlas": {
+    "authority_citations": 4,
+    "remount_verified": true,
+    "revision": [
+      6,
+      "eb1d9bd416a0615fdbaa45f96d37b8ff88ee26d2b95dfd9836c3a64cc1819402"
+    ],
+    "verified": true
+  },
+  "cartographer": {
+    "candidate_count": 60,
+    "design_rank": 48,
+    "family_counts": {
+      "intervention-set": 16,
+      "seasonal-shift": 15,
+      "trend-placebo": 17
+    },
+    "metrics": {
+      "completed": 48,
+      "coverage_debt": 0.2496527777777778,
+      "coverage_debt_sum": 575.2,
+      "frontier": 12,
+      "head_receipt_sha256": "7b0a6bb4ac3e0f227827d0e57ce2dbb9522a1f2412854619017fa6d84287d52b",
+      "information_gain": 124.19358053731312,
+      "observed_values": 2304,
+      "pending": 12,
+      "remaining_bytes": 5200000,
+      "remaining_work": 52.0,
+      "sequence": 48,
+      "targets": 60,
+      "total_bytes": 4800000,
+      "total_work": 48.0
+    },
+    "selected_count": 48
+  },
+  "control": {
+    "conformal": {
+      "exact_profile_count": 6,
+      "joint_coverage": 0.6176470588235294,
+      "mean_marginal_coverage": 0.8023897058823529,
+      "mean_marginal_width_expansion": 0.11072206580017925,
+      "observed_values": 3264,
+      "pooled_profile_count": 1,
+      "settlements": 68
+    },
+    "response_o1": {
+      "bias": 0.027418928969810248,
+      "cusum": 0.0,
+      "ew_absolute_error": 0.15141049556518987,
+      "ew_normalized_error": 0.5403657708993285,
+      "head_event_sha256": "765facf76cdcd7b4c287f59ee9f3b6f8f76694ba88553c8e86de2780fa4fa5e7",
+      "identity_sha256": "c5dfd0e612dfc172d35f97f9f2f3224403fd58f8a85d731dd6449c62f4be4422",
+      "interval_coverage": 0.8023897058823529,
+      "learning_progress": 0.0,
+      "mae": 0.16691473168891974,
+      "mean_interval_width": 0.5928052922598926,
+      "observations": 68,
+      "pinball": {
+        "0x1.0000000000000p-1": 0.08366900474036847,
+        "0x1.999999999999ap-4": 0.037037984321523255,
+        "0x1.ccccccccccccdp-1": 0.050215361858194855
+      },
+      "regime_changes": 0,
+      "regime_generation": 0,
+      "schema": "o1fm.o1-error-metrics/v1",
+      "sequence": 68,
+      "surprise": 0.03294067233735065,
+      "value_count": 3264
+    }
+  },
+  "domains": {
+    "r0_holdout": {
+      "actions": {
+        "crystal": 3,
+        "foundation": 9
+      },
+      "compiled": {
+        "coverage": 0.9114583333333334,
+        "mae": 0.15989687366527508,
+        "pinball": 0.06351313450660305,
+        "width": 0.7439209371805191
+      },
+      "compiled_direction": 0.48757166260632356,
+      "compiled_recovery": 0.7698650466257977,
+      "families": {
+        "intervention-set": {
+          "actions": {
+            "crystal": 1,
+            "foundation": 3
+          },
+          "compiled": {
+            "coverage": 0.9010416666666666,
+            "mae": 0.1781702803564258,
+            "pinball": 0.07118872815303326,
+            "width": 0.7870599925518036
+          },
+          "compiled_direction": 0.8728861691149606,
+          "compiled_recovery": 1.2507541334253856,
+          "raw": {
+            "coverage": 0.640625,
+            "mae": 0.19531644684805846,
+            "pinball": 0.07892800756706768,
+            "width": 0.4500238746404648
+          },
+          "raw_direction": 0.002769357158160554,
+          "raw_recovery": 0.08477439570597194,
+          "selected": {
+            "coverage": 0.7552083333333333,
+            "mae": 0.20217167830560356,
+            "pinball": 0.08048678416675342,
+            "width": 0.5341472998261452
+          }
+        },
+        "seasonal-shift": {
+          "actions": {
+            "crystal": 1,
+            "foundation": 3
+          },
+          "compiled": {
+            "coverage": 0.9114583333333333,
+            "mae": 0.16380404549029967,
+            "pinball": 0.06356694436879806,
+            "width": 0.7731335014104843
+          },
+          "compiled_direction": 0.5898288187040102,
+          "compiled_recovery": 1.058841006452008,
+          "raw": {
+            "coverage": 0.7135416666666666,
+            "mae": 0.1588756789957794,
+            "pinball": 0.06122191379454926,
+            "width": 0.4492088109254837
+          },
+          "raw_direction": 0.5403933068301732,
+          "raw_recovery": 0.17917847830359768,
+          "selected": {
+            "coverage": 0.8177083333333333,
+            "mae": 0.15807753904179359,
+            "pinball": 0.060246131769398026,
+            "width": 0.5242348089814186
+          }
+        },
+        "trend-placebo": {
+          "actions": {
+            "crystal": 1,
+            "foundation": 3
+          },
+          "compiled": {
+            "coverage": 0.9218750000000001,
+            "mae": 0.13771629514909972,
+            "pinball": 0.055783730997977815,
+            "width": 0.6715693175792694
+          },
+          "compiled_direction": 0.0,
+          "compiled_recovery": 0.0,
+          "raw": {
+            "coverage": 0.75,
+            "mae": 0.13937997940229252,
+            "pinball": 0.05484948876297174,
+            "width": 0.44119179993867874
+          },
+          "raw_direction": 0.0,
+          "raw_recovery": 0.0,
+          "selected": {
+            "coverage": 0.8802083333333334,
+            "mae": 0.13548625181041035,
+            "pinball": 0.05244089449437053,
+            "width": 0.4937233254313469
+          }
+        }
+      },
+      "raw": {
+        "coverage": 0.7013888888888888,
+        "mae": 0.16452403508204347,
+        "pinball": 0.0649998033748629,
+        "width": 0.44680816183487576
+      },
+      "raw_direction": 0.18105422132944457,
+      "raw_recovery": 0.0879842913365232,
+      "selected": {
+        "coverage": 0.8177083333333334,
+        "mae": 0.16524515638593587,
+        "pinball": 0.06439127014350733,
+        "width": 0.5173684780796369
+      }
+    },
+    "r1_after_audits": {
+      "actions": {
+        "crystal": 12,
+        "foundation": 0
+      },
+      "compiled": {
+        "coverage": 0.8993055555555555,
+        "mae": 0.13614301308310436,
+        "pinball": 0.05110122742507911,
+        "width": 0.5289621502161026
+      },
+      "compiled_direction": 0.6587669431268944,
+      "compiled_recovery": 0.7704873123424725,
+      "families": {
+        "intervention-set": {
+          "actions": {
+            "crystal": 4,
+            "foundation": 0
+          },
+          "compiled": {
+            "coverage": 0.8958333333333333,
+            "mae": 0.13727176173900563,
+            "pinball": 0.051593579012084584,
+            "width": 0.5284793078899384
+          },
+          "compiled_direction": 0.9918516972165082,
+          "compiled_recovery": 1.1409863831957656,
+          "raw": {
+            "coverage": 0.5572916666666667,
+            "mae": 0.18070666539521577,
+            "pinball": 0.07231943884485299,
+            "width": 0.35387346893548965
+          },
+          "raw_direction": 0.04596470613733135,
+          "raw_recovery": 0.06889570615287774,
+          "selected": {
+            "coverage": 0.8958333333333333,
+            "mae": 0.13727176173900563,
+            "pinball": 0.051593579012084584,
+            "width": 0.5284793078899384
+          }
+        },
+        "seasonal-shift": {
+          "actions": {
+            "crystal": 4,
+            "foundation": 0
+          },
+          "compiled": {
+            "coverage": 0.9114583333333334,
+            "mae": 0.13413967956148554,
+            "pinball": 0.05036989113434977,
+            "width": 0.5307653173804283
+          },
+          "compiled_direction": 0.9844491321641751,
+          "compiled_recovery": 1.1704755538316518,
+          "raw": {
+            "coverage": 0.5625,
+            "mae": 0.1563266524268935,
+            "pinball": 0.06174803693663966,
+            "width": 0.33647288382053375
+          },
+          "raw_direction": 0.3041541925954741,
+          "raw_recovery": 0.1501989581685803,
+          "selected": {
+            "coverage": 0.9114583333333334,
+            "mae": 0.13413967956148554,
+            "pinball": 0.05036989113434977,
+            "width": 0.5307653173804283
+          }
+        },
+        "trend-placebo": {
+          "actions": {
+            "crystal": 4,
+            "foundation": 0
+          },
+          "compiled": {
+            "coverage": 0.890625,
+            "mae": 0.13701759794882187,
+            "pinball": 0.05134021212880299,
+            "width": 0.5276418253779411
+          },
+          "compiled_direction": 0.0,
+          "compiled_recovery": 0.0,
+          "raw": {
+            "coverage": 0.6302083333333334,
+            "mae": 0.1358940792172992,
+            "pinball": 0.05169906375836926,
+            "width": 0.3423369601368904
+          },
+          "raw_direction": 0.0,
+          "raw_recovery": 0.0,
+          "selected": {
+            "coverage": 0.890625,
+            "mae": 0.13701759794882187,
+            "pinball": 0.05134021212880299,
+            "width": 0.5276418253779411
+          }
+        }
+      },
+      "raw": {
+        "coverage": 0.5833333333333334,
+        "mae": 0.1576424656798028,
+        "pinball": 0.061922179846620636,
+        "width": 0.3442277709643046
+      },
+      "raw_direction": 0.11670629957760181,
+      "raw_recovery": 0.07303155477381934,
+      "selected": {
+        "coverage": 0.8993055555555555,
+        "mae": 0.13614301308310436,
+        "pinball": 0.05110122742507911,
+        "width": 0.5289621502161026
+      }
+    },
+    "r1_cold_audits": {
+      "actions": {
+        "crystal": 0,
+        "foundation": 9
+      },
+      "compiled": {
+        "coverage": 0.8263888888888888,
+        "mae": 0.158433938670593,
+        "pinball": 0.062074629623975336,
+        "width": 0.5655942128764259
+      },
+      "compiled_direction": 0.6473586635383399,
+      "compiled_recovery": 0.8394119066192917,
+      "families": {
+        "intervention-set": {
+          "actions": {
+            "crystal": 0,
+            "foundation": 3
+          },
+          "compiled": {
+            "coverage": 0.8402777777777778,
+            "mae": 0.1636096907572614,
+            "pinball": 0.0633235547279448,
+            "width": 0.5637557009855906
+          },
+          "compiled_direction": 0.9809345177902585,
+          "compiled_recovery": 1.2315090553875798,
+          "raw": {
+            "coverage": 0.46527777777777773,
+            "mae": 0.20694711773345867,
+            "pinball": 0.08564102120062174,
+            "width": 0.3345053295294444
+          },
+          "raw_direction": -0.14048091981878022,
+          "raw_recovery": 0.07449395942204963,
+          "selected": {
+            "coverage": 0.46527777777777773,
+            "mae": 0.20694711773345867,
+            "pinball": 0.08564102120062174,
+            "width": 0.3345053295294444
+          }
+        },
+        "seasonal-shift": {
+          "actions": {
+            "crystal": 0,
+            "foundation": 3
+          },
+          "compiled": {
+            "coverage": 0.8194444444444443,
+            "mae": 0.15510721349467835,
+            "pinball": 0.06145971115761955,
+            "width": 0.5663637618223826
+          },
+          "compiled_direction": 0.9611414728247611,
+          "compiled_recovery": 1.2867266644702953,
+          "raw": {
+            "coverage": 0.4305555555555555,
+            "mae": 0.18824375801098844,
+            "pinball": 0.07504140693070417,
+            "width": 0.3246261775493622
+          },
+          "raw_direction": 0.4173105162516288,
+          "raw_recovery": 0.19113202735769327,
+          "selected": {
+            "coverage": 0.4305555555555555,
+            "mae": 0.18824375801098844,
+            "pinball": 0.07504140693070417,
+            "width": 0.3246261775493622
+          }
+        },
+        "trend-placebo": {
+          "actions": {
+            "crystal": 0,
+            "foundation": 3
+          },
+          "compiled": {
+            "coverage": 0.8194444444444445,
+            "mae": 0.1565849117598393,
+            "pinball": 0.06144062298636164,
+            "width": 0.5666631758213043
+          },
+          "compiled_direction": 0.0,
+          "compiled_recovery": 0.0,
+          "raw": {
+            "coverage": 0.5625,
+            "mae": 0.1588078134098194,
+            "pinball": 0.06159718268229036,
+            "width": 0.32656948765118915
+          },
+          "raw_direction": 0.0,
+          "raw_recovery": 0.0,
+          "selected": {
+            "coverage": 0.5625,
+            "mae": 0.1588078134098194,
+            "pinball": 0.06159718268229036,
+            "width": 0.32656948765118915
+          }
+        }
+      },
+      "raw": {
+        "coverage": 0.4861111111111111,
+        "mae": 0.18466622971808885,
+        "pinball": 0.07409320360453875,
+        "width": 0.3285669982433319
+      },
+      "raw_direction": 0.09227653214428286,
+      "raw_recovery": 0.08854199559324766,
+      "selected": {
+        "coverage": 0.4861111111111111,
+        "mae": 0.18466622971808885,
+        "pinball": 0.07409320360453875,
+        "width": 0.3285669982433319
+      }
+    }
+  },
+  "economics": {
+    "actual_measurement_branch_forwards": 33,
+    "baseline_serving_forwards": 44,
+    "selected_serving_forwards": 29,
+    "serving_forward_reduction": 0.34090909090909094,
+    "stages": {
+      "r0_holdout": {
+        "baseline_forwards": 16,
+        "selected_forwards": 13,
+        "serving_forward_reduction": 0.1875
+      },
+      "r1_after_audits": {
+        "baseline_forwards": 16,
+        "selected_forwards": 4,
+        "serving_forward_reduction": 0.75
+      },
+      "r1_cold_audits": {
+        "baseline_forwards": 12,
+        "selected_forwards": 12,
+        "serving_forward_reduction": 0.0
+      }
+    },
+    "training_branch_forwards": 48
+  },
+  "environment": {
+    "device": "cpu",
+    "machine": "arm64",
+    "platform": "macOS-26.5-arm64-arm-64bit-Mach-O",
+    "python": "3.13.1",
+    "torch": "2.13.0"
+  },
+  "identities": {
+    "fit_scope_sha256": "61742fa134b0305b011f08c883c6105625acacadd7f882deb01afd64a93b6d56",
+    "layout_sha256": "2549ddcf855cadcf7e75d51ee9401f2f6be9c99dddfbbf36697fb7def3726e5b",
+    "projection_scope_sha256": "df1fc4dfe290f7f00a9d4b8aed5158f86a23a2a78c3135b153d42ed0cec1270b",
+    "r0_exact_key_sha256": "e66be43172f8a3d187ce065524d460bf016d1a71a1c8436bbfaa01be9f83f7de",
+    "r0_topology_sha256": "9740c3fb5f9950d3650fd5ee2f5b0d56382fb67d2b198888201c19c6cdf6ffee",
+    "r1_exact_key_sha256": "d4f5a29b869f8edf6fc726c9cf21c2223ba0d038223a3a72368d50d7975bff21",
+    "r1_topology_sha256": "7df785deb426fd67c05a0c8bb126554187da8827877613a8904afe3418eff66c",
+    "shared_inner_crystal": true
+  },
+  "response": {
+    "r0": {
+      "coverage": 0.639823717948718,
+      "direction_cosine": 0.4315913405034733,
+      "feature_dim": 129,
+      "mean_effect_error": 0.05048863849474372,
+      "observed_values": 2496,
+      "ready": true,
+      "sequential_support": 52,
+      "support": 81
+    },
+    "r1": {
+      "coverage": 0.9246031746031746,
+      "direction_cosine": 0.9733634005830086,
+      "feature_dim": 129,
+      "mean_effect_error": 0.018085100067153127,
+      "observed_values": 1008,
+      "ready": true,
+      "sequential_support": 21,
+      "support": 81
+    }
+  },
+  "schema": "o1fm.response-transfer-demo/v1",
+  "teacher": {
+    "checkpoint": "amazon/chronos-2",
+    "identity_sha256": "2c682ee10ee739886e0e53956504ca10b7a130fd386b6af101ce0492a8a9ec67",
+    "load_seconds": 5.479535249993205,
+    "weights_sha256": "4ead8c987101dd9d00c6486a947c43e1d1fc47d6957276921f222f29067fa8ab"
+  }
+}

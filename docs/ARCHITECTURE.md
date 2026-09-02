@@ -241,6 +241,29 @@ predict every branch -> decide every action -> settle every branch
 No alternative world's realized outcome can influence another simultaneous
 branch prediction.
 
+`InterventionResponseFeatureEncoder` supplies the executable geometry. Its
+past-only state vector contains level, slope, volatility, observation masks and
+timestamp-derived seasonal phase. Its route vector contains per-target `W1`,
+incoming score/lag mass and every known-channel × target edge cell. Its operator
+tensor retains operation kind, applied delta, sign, time, contiguous-run
+position/duration, pulse and ramp structure for every known-future cell. A
+schema-seeded signed projection gives Cartographer and the ridge compiler one
+bounded D-optimal design space without a future-target channel.
+
+Exact topology-bound schemas retain their own identity and route validation.
+Compatible schemas may declare one explicit projection and fit scope. This
+shares parent response parameters while keeping exact graph/regime wrapper
+statistics separate:
+
+```text
+shared parent prediction
+    + unknown exact ActionBank profile -> foundation fallback
+    + exact direction/coverage/action support -> local release
+```
+
+A new topology can therefore benefit from transferred structure immediately
+without making the transferred predictor its own authority.
+
 ## Economic Action Bank
 
 Each completed ticket records action, wall time, predictor forwards, score,

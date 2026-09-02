@@ -11,6 +11,7 @@ from .cartography_demo import run_cartography_demo
 from .demo import run_demo
 from .intervention_compiler_demo import run_intervention_compiler_demo
 from .open_teacher_demo import run_open_teacher_demo
+from .response_transfer_demo import run_response_transfer_demo
 
 
 def build_parser() -> argparse.ArgumentParser:
@@ -69,6 +70,16 @@ def build_parser() -> argparse.ArgumentParser:
     compiler.add_argument("--training-windows", type=int, default=8)
     compiler.add_argument("--evaluation-windows", type=int, default=4)
     compiler.add_argument("--output", help="optional JSON result path")
+    transfer = subcommands.add_parser(
+        "transfer-demo",
+        help="transfer response surfaces across shape, state, topology, and regime",
+    )
+    transfer.add_argument("--checkpoint")
+    transfer.add_argument("--device", default="cpu")
+    transfer.add_argument("--seed", type=int, default=41)
+    transfer.add_argument("--state-dir")
+    transfer.add_argument("--atlas-dir", required=True)
+    transfer.add_argument("--output", help="optional JSON result path")
     return parser
 
 
@@ -113,6 +124,14 @@ def main(argv: Sequence[str] | None = None) -> int:
             state_dir=args.state_dir,
             training_windows=args.training_windows,
             evaluation_windows=args.evaluation_windows,
+        )
+    elif args.command == "transfer-demo":
+        result = run_response_transfer_demo(
+            checkpoint=args.checkpoint,
+            atlas_dir=args.atlas_dir,
+            device=args.device,
+            seed=args.seed,
+            state_dir=args.state_dir,
         )
     else:  # pragma: no cover - argparse owns commands.
         raise AssertionError("unsupported command")

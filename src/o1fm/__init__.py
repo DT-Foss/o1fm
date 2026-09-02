@@ -105,6 +105,15 @@ from .metrics import ForecastScore, score_prediction, verify_prediction
 from .model import ForecastBatch, ForecastResult, O1FMConfig, O1FMForecaster
 from .o1 import O1Config, O1ErrorStream, O1State
 from .open_teacher_demo import run_open_teacher_demo
+from .response_features import (
+    InterventionResponseFeatureEncoder,
+    InterventionResponseFeatures,
+    ResponseFeatureError,
+    ResponseFeatureSchema,
+    ResponseRouteContext,
+    encode_intervention_response_features,
+)
+from .response_transfer_demo import run_response_transfer_demo
 from .runtime import ForecastSettlement, ForecastTicket, O1FMRuntime
 from .settlements import (
     SettlementConflictError,
@@ -206,6 +215,8 @@ __all__ = [
     "InterventionResponseKey",
     "InterventionResponsePrediction",
     "InterventionResponseStats",
+    "InterventionResponseFeatureEncoder",
+    "InterventionResponseFeatures",
     "InterventionSpec",
     "JointEnvelope",
     "O1Config",
@@ -225,6 +236,9 @@ __all__ = [
     "ProbeWindow",
     "RMSNorm",
     "RouteTransportResult",
+    "ResponseFeatureError",
+    "ResponseFeatureSchema",
+    "ResponseRouteContext",
     "SeasonalNaiveForecaster",
     "SegmentStore",
     "SwiGLU",
@@ -251,6 +265,7 @@ __all__ = [
     "causal_transport_stack",
     "causal_transport_w1",
     "extract_features",
+    "encode_intervention_response_features",
     "execution_key",
     "feature_schema",
     "forecast_loss",
@@ -265,6 +280,7 @@ __all__ = [
     "run_open_teacher_demo",
     "run_cartography_demo",
     "run_intervention_compiler_demo",
+    "run_response_transfer_demo",
     "score_prediction",
     "sha256_json",
     "sinkhorn_transport",

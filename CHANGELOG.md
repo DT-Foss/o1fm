@@ -80,3 +80,14 @@
   magnitudes. It recovers 99.97% / 99.96% of two causal effects, cuts MAE 45.58%
   and pinball 48.82%, improves suffix coverage by 24.48 points, and lets
   ActionBank release 12 branches with four factual forwards instead of 16.
+- Added a leakage-free response feature ABI over factual state, masks,
+  timestamp-derived seasonality, exact route/W1 structure, and a 20-feature
+  tensor for every intervention cell. Exact topology schemas can share one
+  explicit projection scope while retaining distinct identities.
+- Added parent fit scopes to Intervention Response keys. Exact graph/regime
+  readiness remains cold while compatible domains share the inner response
+  parameters; ActionBank must still promote every exact domain independently.
+- Added D-optimal operator-shape and topology transfer execution. A new natural
+  topology first routes 9/9 branches to Chronos, then routes 12/12 locally after
+  three audit origins; adapted MAE falls 13.64%, pinball 17.48%, coverage gains
+  31.60 points, and serving forwards fall 75%.

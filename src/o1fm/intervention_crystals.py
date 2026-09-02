@@ -21,6 +21,7 @@ from .identity import canonical_json_bytes, require_sha256, sha256_json
 
 SCHEMA = "o1fm.intervention-response-bank/v1"
 KEY_SCHEMA = "o1fm.intervention-response-key/v1"
+TRANSFER_KEY_SCHEMA = "o1fm.intervention-response-key/v2"
 OBSERVATION_SCHEMA = "o1fm.intervention-response-observation/v1"
 MAX_STATE_BYTES = 128 * 1024 * 1024
 MAX_TEXT_BYTES = 4096
@@ -149,6 +150,8 @@ class InterventionResponseKey:
     regime: str
     horizon: int
     target_count: int
+    fit_scope_sha256: str | None = None
+    fit_scope_regime: str | None = None
 
     def __post_init__(self) -> None:
         for field in (
@@ -174,6 +177,21 @@ class InterventionResponseKey:
             "target_count",
             _positive_int(self.target_count, field="target_count"),
         )
+        if (self.fit_scope_sha256 is None) != (self.fit_scope_regime is None):
+            raise ValueError(
+                "fit_scope_sha256 and fit_scope_regime must be supplied together"
+            )
+        if self.fit_scope_sha256 is not None:
+            object.__setattr__(
+                self,
+                "fit_scope_sha256",
+                require_sha256(self.fit_scope_sha256, field="fit_scope_sha256"),
+            )
+            object.__setattr__(
+                self,
+                "fit_scope_regime",
+                _text(self.fit_scope_regime, field="fit_scope_regime"),
+            )
 
     @property
     def output_dim(self) -> int:
@@ -184,7 +202,7 @@ class InterventionResponseKey:
         return sha256_json(self.to_record())
 
     def to_record(self) -> dict[str, object]:
-        return {
+        record: dict[str, object] = {
             "feature_schema": self.feature_schema,
             "graph_revision": self.graph_revision,
             "horizon": self.horizon,
@@ -195,10 +213,15 @@ class InterventionResponseKey:
             "target_count": self.target_count,
             "target_schema": self.target_schema,
         }
+        if self.fit_scope_sha256 is not None:
+            record["schema"] = TRANSFER_KEY_SCHEMA
+            record["fit_scope_sha256"] = self.fit_scope_sha256
+            record["fit_scope_regime"] = self.fit_scope_regime
+        return record
 
     @classmethod
     def from_record(cls, value: object) -> InterventionResponseKey:
-        if not isinstance(value, Mapping) or set(value) != {
+        base_fields = {
             "feature_schema",
             "graph_revision",
             "horizon",
@@ -208,9 +231,18 @@ class InterventionResponseKey:
             "schema",
             "target_count",
             "target_schema",
-        }:
+        }
+        if not isinstance(value, Mapping):
             raise InterventionResponseIntegrityError("response key record is invalid")
-        if value["schema"] != KEY_SCHEMA:
+        schema = value.get("schema")
+        expected_fields = (
+            base_fields
+            if schema == KEY_SCHEMA
+            else base_fields | {"fit_scope_sha256", "fit_scope_regime"}
+        )
+        if set(value) != expected_fields:
+            raise InterventionResponseIntegrityError("response key record is invalid")
+        if schema not in {KEY_SCHEMA, TRANSFER_KEY_SCHEMA}:
             raise InterventionResponseIntegrityError(
                 "response key schema is unsupported"
             )
@@ -223,6 +255,8 @@ class InterventionResponseKey:
             regime=value["regime"],  # type: ignore[arg-type]
             horizon=value["horizon"],  # type: ignore[arg-type]
             target_count=value["target_count"],  # type: ignore[arg-type]
+            fit_scope_sha256=value.get("fit_scope_sha256"),  # type: ignore[arg-type]
+            fit_scope_regime=value.get("fit_scope_regime"),  # type: ignore[arg-type]
         )
 
     def crystal_key(self) -> ForecastCrystalKey:
@@ -236,8 +270,8 @@ class InterventionResponseKey:
                     "target_schema": self.target_schema,
                 }
             ),
-            graph_revision=self.graph_revision,
-            regime=self.regime,
+            graph_revision=self.fit_scope_sha256 or self.graph_revision,
+            regime=self.fit_scope_regime or self.regime,
             horizon=self.horizon,
             target_count=self.target_count,
         )

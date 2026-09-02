@@ -188,3 +188,67 @@ def test_prepared_observation_recovers_after_effect_bank_failure(
     )
     assert recovered.support == 1
     assert _bank(root).describe(key).support == 1
+
+
+def test_parent_fit_transfers_but_new_exact_domain_stays_unready(
+    tmp_path: Path,
+) -> None:
+    bank = _bank(tmp_path / "response")
+    parent = "a" * 64
+    source = InterventionResponseKey(
+        model_identity="1" * 64,
+        feature_schema="2" * 64,
+        intervention_schema="4" * 64,
+        target_schema="5" * 64,
+        graph_revision="3" * 64,
+        regime="regime:0",
+        horizon=2,
+        target_count=1,
+        fit_scope_sha256=parent,
+        fit_scope_regime="shared-response",
+    )
+    destination = InterventionResponseKey(
+        model_identity="1" * 64,
+        feature_schema="2" * 64,
+        intervention_schema="4" * 64,
+        target_schema="5" * 64,
+        graph_revision="6" * 64,
+        regime="regime:1",
+        horizon=2,
+        target_count=1,
+        fit_scope_sha256=parent,
+        fit_scope_regime="shared-response",
+    )
+    assert source.identity_sha256 != destination.identity_sha256
+    assert source.crystal_key() == destination.crystal_key()
+    factual_prediction = _factual()
+    for index, value in enumerate((-2.0, 2.0, -1.0, 1.0, 0.0, 0.5, -0.5)):
+        factual, intervention = _target(2.0 * value)
+        bank.observe(
+            source,
+            (1.0, value),
+            factual_prediction,
+            factual,
+            intervention,
+            observation_id=f"source:{index}",
+        )
+    transferred = bank.predict(destination, (1.0, 0.75), factual_prediction)
+    assert transferred is not None
+    assert not transferred.stats.ready
+    np.testing.assert_allclose(
+        transferred.effect_point[:, 0],
+        (1.5, 3.0),
+        atol=2e-3,
+    )
+
+    for index, value in enumerate((-0.75, 0.25, 0.75)):
+        factual, intervention = _target(2.0 * value)
+        bank.observe(
+            destination,
+            (1.0, value),
+            factual_prediction,
+            factual,
+            intervention,
+            observation_id=f"destination:{index}",
+        )
+    assert bank.describe(destination).ready

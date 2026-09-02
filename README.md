@@ -214,6 +214,38 @@ The committed receipt is
 [`results/o1fm-chronos2-intervention-compiler-v1.json`](results/o1fm-chronos2-intervention-compiler-v1.json),
 SHA-256 `1f949f09faa27fc501db68cb2e4cbdff9e6589d73cd0a115991158c70af1f939`.
 
+## Shape and topology transfer result
+
+The response compiler now consumes a complete pre-outcome geometry: factual
+state, masks, seasonal phase, routed edge/W1 structure, and a 20-feature tensor
+for every intervention cell. Sixty pulse/constant candidates across four
+states enter the Cartographer; D-optimal acquisition selects 48 with design
+rank 48. Evaluation uses only unseen ramps, masked intervals, and double pulses.
+
+Two natural structural regimes produce different authenticated graph
+topologies. Their exact ActionBank, Conformal, direction, and coverage profiles
+remain separate while one explicit parent fit scope shares response parameters.
+
+| Stage | ActionBank | Raw Chronos | Parent Response Crystal |
+|---|---:|---:|---:|
+| New topology, cold | **9/9 foundation** | MAE 0.18467 | shadow MAE 0.15843 |
+| New topology, after 3 audit origins | **12/12 crystal** | MAE 0.15764 | **0.13614** |
+| Adapted probabilistic quality | — | pinball 0.06192 | **0.05110** |
+| Adapted marginal coverage | — | 58.33% | **89.93%** |
+| Adapted serving forwards | 16 | 16 | **4** |
+
+The transferred parent is already better during the cold phase, but O1FM does
+not serve it without exact-domain evidence. After three origins, ActionBank
+releases all later branches locally: MAE falls 13.64%, pinball 17.48%, coverage
+gains 31.60 points, and serving work falls 75%. Across all 68 compiled
+settlements, the Directed O1 field holds 80.24% marginal coverage. The response
+O1 stream did not declare a separate CUSUM generation in this run; the proven
+shift is structural-regime plus authenticated graph-topology transfer.
+
+The committed receipt is
+[`results/o1fm-chronos2-response-transfer-v1.json`](results/o1fm-chronos2-response-transfer-v1.json),
+SHA-256 `d36417d40b24c7218f5abbc7955a9750f6db1af959b0b7304740b6150a5eae04`.
+
 ## Relationship to TimesFM
 
 Google's TimesFM-3 established the strongest current reference geometry for
@@ -262,6 +294,13 @@ Compile earlier interventions and release later unseen magnitudes locally:
 ```bash
 PYTHONPATH=/path/to/immer/src python -m o1fm compiler-demo \
   --atlas-dir artifacts/private/intervention-compiler-atlas.causal
+```
+
+Run cold-to-local transfer across unseen shapes and a new graph topology:
+
+```bash
+PYTHONPATH=/path/to/immer/src python -m o1fm transfer-demo \
+  --atlas-dir artifacts/private/response-transfer-atlas.causal
 ```
 
 O1FM is developed by David Tom Foss.

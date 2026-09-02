@@ -279,3 +279,37 @@ the four-window unseen-magnitude suffix rises from 47.40% raw coverage to
 71.88%. The remaining suffix calibration debt, new operator shapes, topology
 shifts and regime transfer are now the next Cartographer targets rather than
 missing architecture.
+
+## First response transfer execution
+
+The compiler now receives full factual-state, route and time-resolved operator
+geometry. Sixty pulse/constant candidates span four factual origins; the
+Cartographer acquires 48 at design rank 48. No ramp, masked interval or
+double-pulse operator appears in that fit set.
+
+Later regime-0 windows evaluate exactly those unseen shapes. A second structural
+regime supplies a genuinely different authenticated route topology. Both exact
+domains share one explicit parent fit and projection scope, while ActionBank,
+Conformal, direction and coverage authority remain graph/regime exact.
+
+The new topology demonstrates the intended state machine:
+
+```text
+parent response exists
+    -> exact profile unknown
+    -> 9/9 branches use Chronos
+    -> three audit origins settle exact evidence
+    -> next 12/12 branches use the parent Crystal
+```
+
+After release, MAE falls from 0.15764 to 0.13614, pinball from 0.06192 to
+0.05110, and marginal coverage rises from 58.33% to 89.93%. Serving the four
+origins requires one factual forward each instead of factual plus three branch
+forwards: 16 → 4. Across all response settlements, the directed O1 field holds
+80.24% marginal coverage.
+
+The response O1 stream does not cross its CUSUM regime threshold in this run.
+The proven transfer axis is therefore structural regime plus graph topology,
+not an O1-generation transition. The next experiment must induce and bind a
+real O1 generation, then test whether the same parent/fallback/adaptation cycle
+holds without resetting the stream.
