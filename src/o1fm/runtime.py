@@ -12,6 +12,12 @@ import numpy as np
 from .action_bank import ActionBank, ActionProfileKey, ActionReceipt
 from .baselines import SeasonalNaiveForecaster
 from .causal_graph import CausalEdge, OnlineCausalGraph
+from .conformal import (
+    ConformalApplication,
+    ConformalFieldKey,
+    ConformalUpdate,
+    O1ConformalField,
+)
 from .contracts import ForecastInputs, ForecastPrediction, ForecastTarget
 from .crystals import ForecastCrystalBank, ForecastCrystalKey, ForecastCrystalPrediction
 from .features import extract_features, feature_schema
@@ -42,6 +48,8 @@ class ForecastTicket:
     ticket_id: str
     inputs: ForecastInputs
     prediction: ForecastPrediction
+    base_prediction: ForecastPrediction
+    calibration: ConformalApplication | None
     action: str
     profile: ActionProfileKey
     crystal_key: ForecastCrystalKey
@@ -58,7 +66,10 @@ class ForecastSettlement:
     ticket_id: str
     action: str
     score: ForecastScore
+    base_score: ForecastScore
     o1_update: O1Update
+    calibration_update: ConformalUpdate | None
+    joint_covered: bool | None
     crystal_ready: bool
     foundation_forwards: int
     saved_foundation_forwards: int
@@ -91,6 +102,7 @@ class O1FMRuntime:
         graph: OnlineCausalGraph,
         crystals: ForecastCrystalBank,
         actions: ActionBank,
+        conformal: O1ConformalField | None = None,
         seasonal_period: int = 24,
         route_top_k: int = 8,
         route_stability: int = 3,
@@ -113,12 +125,15 @@ class O1FMRuntime:
             raise TypeError("enable_seasonal must be boolean")
         if tuple(crystals.quantile_levels) != tuple(model.config.quantiles):
             raise ValueError("Crystal and foundation quantile inventories must match")
+        if conformal is not None and not isinstance(conformal, O1ConformalField):
+            raise TypeError("conformal must be O1ConformalField or None")
         self.model = model
         self.model_identity = model_identity
         self.o1 = o1
         self.graph = graph
         self.crystals = crystals
         self.actions = actions
+        self.conformal = conformal
         self.seasonal = SeasonalNaiveForecaster(
             period=seasonal_period,
             quantile_levels=crystals.quantile_levels,
@@ -250,6 +265,30 @@ class O1FMRuntime:
             state.pending_support = 0
         return state.active
 
+    def _calibrate(
+        self,
+        profile: ActionProfileKey,
+        action: str,
+        prediction: ForecastPrediction,
+    ) -> ConformalApplication | None:
+        if self.conformal is None:
+            return None
+        if prediction.quantile_levels is None:
+            raise ValueError("conformal runtime requires probabilistic predictions")
+        levels = tuple(prediction.quantile_levels)
+        key = ConformalFieldKey(
+            model_identity=profile.model_identity,
+            feature_schema=profile.feature_schema,
+            graph_revision=profile.graph_revision,
+            regime=profile.regime,
+            action=action,
+            horizon=profile.horizon,
+            target_count=profile.target_count,
+            lower_quantile=levels[0],
+            upper_quantile=levels[-1],
+        )
+        return self.conformal.apply(key, prediction)
+
     def forecast(self, inputs: ForecastInputs) -> ForecastTicket:
         if not isinstance(inputs, ForecastInputs):
             raise TypeError("inputs must be ForecastInputs")
@@ -277,29 +316,70 @@ class O1FMRuntime:
         )
         profile = ActionProfileKey(**crystal_key.to_document())
         candidates: dict[str, tuple[ForecastPrediction, float]] = {}
+        candidate_calibrations: dict[str, ConformalApplication] = {}
 
         if self.enable_seasonal:
             started = time.perf_counter()
-            seasonal = self.seasonal.predict(inputs)
+            seasonal_base = self.seasonal.predict(inputs)
+            seasonal_calibration = self._calibrate(
+                profile,
+                "seasonal",
+                seasonal_base,
+            )
+            seasonal = (
+                seasonal_base
+                if seasonal_calibration is None
+                else seasonal_calibration.prediction
+            )
             candidates["seasonal"] = (seasonal, time.perf_counter() - started)
+            if seasonal_calibration is not None:
+                candidate_calibrations["seasonal"] = seasonal_calibration
 
         started = time.perf_counter()
         crystal_raw = self.crystals.predict(crystal_key, features, regime=regime)
         if crystal_raw is not None:
+            crystal_base = _prediction_from_crystal(inputs, crystal_raw)
+            crystal_calibration = self._calibrate(
+                profile,
+                "crystal",
+                crystal_base,
+            )
             candidates["crystal"] = (
-                _prediction_from_crystal(inputs, crystal_raw),
+                (
+                    crystal_base
+                    if crystal_calibration is None
+                    else crystal_calibration.prediction
+                ),
                 time.perf_counter() - started,
             )
+            if crystal_calibration is not None:
+                candidate_calibrations["crystal"] = crystal_calibration
 
         recommendation = self.actions.recommend(profile)
         action = recommendation.action
         if action in candidates:
             prediction, latency = candidates[action]
+            calibration = candidate_calibrations.get(action)
+            base_prediction = (
+                prediction if calibration is None else calibration.base_prediction
+            )
             forwards = 0
         else:
             action = "foundation"
             started = time.perf_counter()
-            prediction = foundation_predict(self.model, inputs, device=self.device)
+            base_prediction = foundation_predict(
+                self.model,
+                inputs,
+                device=self.device,
+            )
+            calibration = self._calibrate(
+                profile,
+                action,
+                base_prediction,
+            )
+            prediction = (
+                base_prediction if calibration is None else calibration.prediction
+            )
             latency = time.perf_counter() - started
             forwards = 1
         prediction.validate_for(inputs)
@@ -318,6 +398,8 @@ class O1FMRuntime:
             ticket_id=ticket_id,
             inputs=inputs,
             prediction=prediction,
+            base_prediction=base_prediction,
+            calibration=calibration,
             action=action,
             profile=profile,
             crystal_key=crystal_key,
@@ -361,6 +443,7 @@ class O1FMRuntime:
         if not isinstance(ticket, ForecastTicket):
             raise TypeError("ticket must be ForecastTicket")
         score = score_prediction(ticket.prediction, target)
+        base_score = score_prediction(ticket.base_prediction, target)
         quantile_map = {}
         if ticket.prediction.quantiles is not None:
             assert ticket.prediction.quantile_levels is not None
@@ -379,6 +462,16 @@ class O1FMRuntime:
             mask=target.mask,
             observation_id=f"ticket:{ticket.ticket_id}",
         )
+        calibration_update = None
+        if self.conformal is not None and ticket.calibration is not None:
+            calibration_update = self.conformal.observe(
+                ticket.calibration.key,
+                ticket.calibration,
+                target,
+                surprise=update.surprise,
+                cusum=update.cusum,
+                observation_id=f"ticket:{ticket.ticket_id}",
+            )
         crystal_stats = self.crystals.observe(
             ticket.crystal_key,
             ticket.features,
@@ -426,7 +519,12 @@ class O1FMRuntime:
             ticket_id=ticket.ticket_id,
             action=ticket.action,
             score=score,
+            base_score=base_score,
             o1_update=update,
+            calibration_update=calibration_update,
+            joint_covered=(
+                None if calibration_update is None else calibration_update.joint_hit
+            ),
             crystal_ready=False if crystal_stats is None else crystal_stats.ready,
             foundation_forwards=ticket.foundation_forwards,
             saved_foundation_forwards=int(ticket.action != "foundation"),

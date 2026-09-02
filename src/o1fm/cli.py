@@ -20,6 +20,11 @@ def build_parser() -> argparse.ArgumentParser:
     demo.add_argument("--seed", type=int, default=7)
     demo.add_argument("--state-dir")
     demo.add_argument("--output", help="optional JSON result path")
+    demo.add_argument(
+        "--no-conformal",
+        action="store_true",
+        help="disable the directed O1 conformal field",
+    )
     return parser
 
 
@@ -31,6 +36,7 @@ def main(argv: Sequence[str] | None = None) -> int:
         seed=args.seed,
         epochs=args.epochs,
         state_dir=args.state_dir,
+        enable_conformal=not args.no_conformal,
     )
     encoded = json.dumps(
         result,

@@ -8,6 +8,7 @@ import torch
 from o1fm.action_bank import ActionBank
 from o1fm.baselines import SeasonalNaiveForecaster
 from o1fm.causal_graph import CausalEdge, CausalGraphConfig, OnlineCausalGraph
+from o1fm.conformal import O1ConformalField
 from o1fm.contracts import ForecastInputs, ForecastTarget
 from o1fm.crystals import ForecastCrystalBank
 from o1fm.features import extract_features, feature_schema
@@ -226,3 +227,45 @@ def test_runtime_trains_crystal_from_partial_settlement(tmp_path: Path) -> None:
     assert runtime.o1.metrics()["value_count"] == 1
     assert stats is not None
     assert stats.support == 1
+
+
+def test_runtime_applies_and_settles_directed_conformal_field(tmp_path: Path) -> None:
+    model = KnownFutureModel()
+    field = O1ConformalField(tmp_path / "conformal")
+    runtime = O1FMRuntime(
+        model,
+        model_identity="a" * 64,
+        o1=O1ErrorStream(tmp_path / "o1-conformal.json", stream_id="series-a"),
+        graph=OnlineCausalGraph(tmp_path / "graph-conformal", graph_id="series-a"),
+        crystals=ForecastCrystalBank(
+            tmp_path / "crystals-conformal.json",
+            quantile_levels=model.config.quantiles,
+        ),
+        actions=ActionBank(tmp_path / "actions-conformal.json"),
+        conformal=field,
+        enable_seasonal=False,
+    )
+    inputs = _inputs(known_future=3.0)
+    target = _target(inputs, value=5.0)
+
+    cold = runtime.forecast(inputs)
+    np.testing.assert_array_equal(
+        cold.prediction.quantiles, cold.base_prediction.quantiles
+    )
+    first = runtime.settle(cold, target)
+    assert first.calibration_update is not None
+    assert first.joint_covered is False
+
+    charged = runtime.forecast(inputs)
+    assert charged.calibration is not None
+    np.testing.assert_array_equal(
+        charged.prediction.point, charged.base_prediction.point
+    )
+    assert np.all(
+        charged.prediction.quantiles[:, :, -1]
+        > charged.base_prediction.quantiles[:, :, -1]
+    )
+    second = runtime.settle(charged, target)
+    assert second.score.interval_coverage == 1.0
+    assert second.base_score.interval_coverage == 0.0
+    assert field.metrics()["settlements"] == 2

@@ -14,6 +14,7 @@ import torch
 from .action_bank import ActionBank
 from .baselines import SeasonalNaiveForecaster
 from .causal_graph import CausalGraphConfig, OnlineCausalGraph
+from .conformal import ConformalFieldConfig, O1ConformalField
 from .crystals import ForecastCrystalBank
 from .metrics import score_prediction
 from .model import O1FMConfig, O1FMForecaster
@@ -32,6 +33,7 @@ def run_demo(
     seed: int = 7,
     epochs: int = 20,
     state_dir: str | Path | None = None,
+    enable_conformal: bool = True,
 ) -> dict[str, object]:
     """Train a compact backbone, then replace verified online forwards."""
 
@@ -71,20 +73,45 @@ def run_demo(
 
     direct_mae = []
     direct_pinball = []
+    direct_coverage = []
+    direct_width = []
+    direct_joint = []
     seasonal_mae = []
     seasonal = SeasonalNaiveForecaster(
         period=config.seasonal_period,
         quantile_levels=model.config.quantiles,
     )
     for example in online:
-        direct = score_prediction(
-            predict(model, example.inputs), example.require_target()
-        )
+        direct_prediction = predict(model, example.inputs)
+        direct = score_prediction(direct_prediction, example.require_target())
         baseline = score_prediction(
             seasonal.predict(example.inputs), example.require_target()
         )
         direct_mae.append(direct.mae)
         direct_pinball.append(direct.mae if direct.pinball is None else direct.pinball)
+        direct_coverage.append(
+            0.0 if direct.interval_coverage is None else direct.interval_coverage
+        )
+        direct_width.append(
+            0.0 if direct.interval_width is None else direct.interval_width
+        )
+        assert direct_prediction.quantiles is not None
+        target = example.require_target()
+        observed = np.asarray(target.mask, dtype=np.bool_)
+        direct_joint.append(
+            float(
+                (
+                    (
+                        target.values[observed]
+                        >= direct_prediction.quantiles[..., 0][observed]
+                    )
+                    & (
+                        target.values[observed]
+                        <= direct_prediction.quantiles[..., -1][observed]
+                    )
+                ).all()
+            )
+        )
         seasonal_mae.append(baseline.mae)
 
     temporary = tempfile.TemporaryDirectory() if state_dir is None else None
@@ -111,6 +138,14 @@ def run_demo(
             latency_cost_weight=0.0,
             forward_cost_weight=10.0,
         )
+        conformal = (
+            O1ConformalField(
+                root / "conformal-field",
+                config=ConformalFieldConfig(target_coverage=0.8),
+            )
+            if enable_conformal
+            else None
+        )
         runtime = O1FMRuntime(
             model,
             model_identity=identity,
@@ -134,11 +169,19 @@ def run_demo(
             ),
             crystals=crystals,
             actions=actions,
+            conformal=conformal,
             seasonal_period=config.seasonal_period,
             enable_seasonal=False,
         )
         selected_mae = []
         selected_pinball = []
+        selected_coverage = []
+        selected_width = []
+        base_pinball = []
+        base_coverage = []
+        base_width = []
+        base_joint = []
+        joint_coverage = []
         action_trace = []
         foundation_forwards = 0
         saved_forwards = 0
@@ -153,13 +196,66 @@ def run_demo(
                 if settlement.score.pinball is None
                 else settlement.score.pinball
             )
+            selected_coverage.append(
+                0.0
+                if settlement.score.interval_coverage is None
+                else settlement.score.interval_coverage
+            )
+            selected_width.append(
+                0.0
+                if settlement.score.interval_width is None
+                else settlement.score.interval_width
+            )
+            base_pinball.append(
+                settlement.base_score.mae
+                if settlement.base_score.pinball is None
+                else settlement.base_score.pinball
+            )
+            base_coverage.append(
+                0.0
+                if settlement.base_score.interval_coverage is None
+                else settlement.base_score.interval_coverage
+            )
+            base_width.append(
+                0.0
+                if settlement.base_score.interval_width is None
+                else settlement.base_score.interval_width
+            )
+            assert ticket.base_prediction.quantiles is not None
+            target = example.require_target()
+            observed = np.asarray(target.mask, dtype=np.bool_)
+            base_joint.append(
+                float(
+                    (
+                        (
+                            target.values[observed]
+                            >= ticket.base_prediction.quantiles[..., 0][observed]
+                        )
+                        & (
+                            target.values[observed]
+                            <= ticket.base_prediction.quantiles[..., -1][observed]
+                        )
+                    ).all()
+                )
+            )
+            if settlement.joint_covered is not None:
+                joint_coverage.append(float(settlement.joint_covered))
             foundation_forwards += settlement.foundation_forwards
             saved_forwards += settlement.saved_foundation_forwards
         runtime_seconds = time.perf_counter() - runtime_started
         graph_metrics = runtime.graph.metrics()
         o1_metrics = runtime.o1.metrics()
+        conformal_metrics = None if conformal is None else conformal.metrics()
 
     baseline_forwards = len(online)
+    direct_coverage_mean = _mean(direct_coverage)
+    direct_width_mean = _mean(direct_width)
+    base_coverage_mean = _mean(base_coverage)
+    base_width_mean = _mean(base_width)
+    runtime_coverage_mean = _mean(selected_coverage)
+    runtime_width_mean = _mean(selected_width)
+    width_expansion = runtime_width_mean - base_width_mean
+    coverage_gain = runtime_coverage_mean - base_coverage_mean
     result = {
         "actions": {
             "crystal": action_trace.count("crystal"),
@@ -169,6 +265,7 @@ def run_demo(
         },
         "architecture": {
             "causal_temporal_attention": True,
+            "directed_o1_conformal_field": enable_conformal,
             "forecast_crystals": True,
             "known_future_covariates": True,
             "non_autoregressive_horizon": True,
@@ -189,16 +286,39 @@ def run_demo(
             "saved_foundation_forwards": saved_forwards,
         },
         "graph": graph_metrics,
+        "calibration": {
+            "direct_foundation_joint_coverage": _mean(direct_joint),
+            "direct_foundation_marginal_coverage": direct_coverage_mean,
+            "direct_foundation_mean_width": direct_width_mean,
+            "field": conformal_metrics,
+            "marginal_coverage_gain": coverage_gain,
+            "marginal_coverage_gap_to_target": runtime_coverage_mean - 0.8,
+            "marginal_coverage_gain_per_width": (
+                coverage_gain / width_expansion if width_expansion > 0.0 else 0.0
+            ),
+            "runtime_base_marginal_coverage": base_coverage_mean,
+            "runtime_base_joint_coverage": _mean(base_joint),
+            "runtime_base_mean_width": base_width_mean,
+            "runtime_joint_coverage": (
+                None if not joint_coverage else _mean(joint_coverage)
+            ),
+            "runtime_marginal_coverage": runtime_coverage_mean,
+            "runtime_mean_width": runtime_width_mean,
+            "target_coverage": 0.8,
+            "width_expansion": width_expansion,
+            "width_ratio": runtime_width_mean / max(base_width_mean, 1e-12),
+        },
         "model_identity_sha256": identity,
         "o1": o1_metrics,
         "quality": {
             "direct_foundation_mae": _mean(direct_mae),
             "direct_foundation_pinball": _mean(direct_pinball),
             "runtime_mae": _mean(selected_mae),
+            "runtime_base_pinball": _mean(base_pinball),
             "runtime_pinball": _mean(selected_pinball),
             "seasonal_mae": _mean(seasonal_mae),
         },
-        "schema": "o1fm.demo-result/v1",
+        "schema": "o1fm.demo-result/v2",
         "timing": {
             "runtime_seconds": runtime_seconds,
             "training_seconds": training_seconds,

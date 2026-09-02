@@ -22,12 +22,14 @@ ForecastBatch
        -> ForecastCrystal.predict       # zero foundation forwards
        -> StructuralBaseline.predict    # zero foundation forwards
        -> O1FMModel.forward             # novelty authority
+  -> DirectedConformalField.apply       # prior settlements only
   -> ForecastVerifier
   -> ForecastTicket
 
 ForecastTicket + realized future
   -> proper scoring / residual vector / coverage
   -> O1State.observe
+  -> DirectedConformalField.observe
   -> CausalGraph.observe
   -> ForecastCrystalBank.observe
   -> ActionBank.settle
@@ -35,6 +37,25 @@ ForecastTicket + realized future
 
 Every learned object is scoped by model identity, feature schema, horizon,
 causal-graph revision, and O1 regime generation.
+
+## Directed conformal control
+
+The base predictor's outer quantiles define scale-normalized, non-negative CQR
+scores independently for the lower and upper tails. Exact histories are keyed by
+action, route and regime. A parent field shares evidence across cold actions and
+new graph/regime identities. Forecast-time application reads committed history
+only; settlement appends the realized score afterward.
+
+The two tail alphas and the joint trajectory alpha follow adaptive conformal
+updates. O1 surprise and CUSUM increase the update gain under drift. The point
+forecast and inner quantiles remain untouched; only the outer interval expands.
+The joint path envelope is returned separately and never forced into the
+marginal prediction.
+
+The temporal/variate distinction is structural: causal temporal attention is
+row-stochastic, while exact Sinkhorn transport is applied only across
+simultaneously visible variates. Exact bistochastic causal temporal attention
+would collapse to identity.
 
 ## Forecast backbone
 

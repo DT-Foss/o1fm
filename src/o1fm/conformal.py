@@ -841,9 +841,10 @@ def _reject_duplicate_keys(pairs: list[tuple[str, object]]) -> dict[str, object]
 def _empirical_higher(values: Sequence[float], probability: float) -> float:
     if not values:
         return 0.0
-    result = float(
-        np.quantile(np.asarray(values, dtype=np.float64), probability, method="higher")
-    )
+    count = len(values)
+    rank = min(count, max(1, math.ceil((count + 1) * probability)))
+    ordered = np.sort(np.asarray(values, dtype=np.float64))
+    result = float(ordered[rank - 1])
     return max(result, 0.0)
 
 

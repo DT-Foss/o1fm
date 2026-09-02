@@ -13,6 +13,15 @@ from .attention import (
 )
 from .baselines import SeasonalNaiveForecaster
 from .causal_graph import CausalEdge, CausalGraphConfig, OnlineCausalGraph
+from .conformal import (
+    ConformalApplication,
+    ConformalConflictError,
+    ConformalFieldConfig,
+    ConformalFieldKey,
+    ConformalIntegrityError,
+    ConformalUpdate,
+    O1ConformalField,
+)
 from .contracts import (
     ForecastExample,
     ForecastInputs,
@@ -46,6 +55,12 @@ __all__ = [
     "CanonicalIdentity",
     "CausalEdge",
     "CausalGraphConfig",
+    "ConformalApplication",
+    "ConformalConflictError",
+    "ConformalFieldConfig",
+    "ConformalFieldKey",
+    "ConformalIntegrityError",
+    "ConformalUpdate",
     "CrossVariateSinkhornAttention",
     "FEATURE_ABI",
     "ForecastBatch",
@@ -67,6 +82,7 @@ __all__ = [
     "O1FMConfig",
     "O1FMForecaster",
     "O1FMRuntime",
+    "O1ConformalField",
     "O1State",
     "OnlineCausalGraph",
     "RMSNorm",

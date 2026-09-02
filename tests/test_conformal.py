@@ -14,6 +14,7 @@ from o1fm.conformal import (
     ConformalFieldKey,
     ConformalIntegrityError,
     O1ConformalField,
+    _empirical_higher,
 )
 from o1fm.contracts import ForecastPrediction, ForecastTarget
 
@@ -100,6 +101,11 @@ def test_cold_start_is_exactly_unchanged_and_arrays_are_immutable(
         "joint_coverage": 0.0,
         "mean_marginal_width_expansion": 0.0,
     }
+
+
+def test_empirical_quantile_uses_finite_sample_conformal_rank() -> None:
+    values = tuple(float(index) for index in range(11))
+    assert _empirical_higher(values, 0.8) == 9.0
 
 
 def test_directed_tails_expand_independently_and_keep_inner_quantiles(

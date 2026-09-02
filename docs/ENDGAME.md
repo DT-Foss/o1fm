@@ -1,0 +1,196 @@
+# O1FM Endgame
+
+## The Self-Compiling Causal Forecast Fabric
+
+A foundation forecaster predicts the next trajectory. O1FM builds and operates
+the executable model of the world that produces trajectories.
+
+The endgame is a temporal operating system with five coupled capabilities:
+
+1. forecast factual multivariate trajectories;
+2. maintain calibrated marginal and joint uncertainty under live drift;
+3. branch over explicit interventions and counterfactual conditions;
+4. compile settled, repeated dynamics into tiny executable Forecast Crystals;
+5. spend observations, teacher forwards and idle compute where they remove the
+   most decision-relevant uncertainty.
+
+```text
+live stream + known interventions
+                |
+          causal Atlas
+                |
+       O1 state and regime
+                |
+     directed conformal field
+                |
+       economic action compiler
+        /          |          \
+   Crystal     local model     open teacher
+        \          |          /
+     factual trajectory + joint envelope
+     counterfactual branch graph
+     decision-regret envelope
+                |
+             settlement
+                |
+ O1 + Atlas + Conformal + Crystal learning
+                |
+ active sensing and background branch farming
+```
+
+## Three categories beyond forecasting
+
+### 1. Governed trajectories
+
+Every prediction carries a route, regime, action and model identity. The runtime
+returns ordered quantiles, asymmetric conformal reserves and a whole-trajectory
+envelope. Realized outcomes are the only authority that can change coverage,
+promote a cheap action or charge a Crystal.
+
+### 2. Executable causal branches
+
+Known-future covariates become named interventions. The live graph separates
+observational edges from intervention edges. O1FM evaluates factual and
+interventional trajectories through the same settlement contract, then compiles
+stable local response surfaces into Forecast Crystals. A Crystal is a local
+dynamics operator, not a cached answer.
+
+### 3. Autonomous temporal computation
+
+O1FM computes the value of another measurement, intervention, teacher call or
+simulation. Idle compute explores graph-reachable branches and materializes the
+ones with positive expected live value. Past compute is released later as a
+verified local response surface. This is the forecasting equivalent of a charged
+power bank: work is prepaid over a causal state/action region and discharged when
+the live state enters that region.
+
+## The backbone is a replaceable teacher
+
+O1FM owns the control plane. External foundation models are optional teachers,
+not the architecture.
+
+- **Toto 2.0 22M** is the primary compact trajectory teacher. Its Apache-2.0
+  checkpoint is 84 MB, emits nine quantiles and alternates causal temporal with
+  full variate attention. [Official model card](https://huggingface.co/Datadog/Toto-2.0-22m)
+- **Chronos-2 120M** is the covariate teacher. It is Apache-2.0 and natively
+  supports multivariate targets, past-only covariates and known-future
+  covariates. [Official model card](https://huggingface.co/amazon/chronos-2)
+- **TimesFM-3** remains an architecture reference. Its source is Apache-2.0 and
+  its default checkpoint uses the separate non-commercial license.
+  [Google Research](https://research.google/blog/timesfm-3-a-zero-shot-foundation-model-for-multivariate-forecasting/)
+
+ActionBank can route between teachers by capability and economics. O1FM's own
+backbone remains the sovereign trainable implementation and the destination for
+compiled knowledge.
+
+## Directed O1 Conformal Field
+
+A symmetric global width multiplier is too small for directed regime drift.
+O1FM maintains separate lower-tail and upper-tail reserves for every
+`[route, regime, action, horizon, target]` cell, plus a joint path reserve.
+
+For realized target `y`, outer quantiles `q_lo`, `q_hi` and point forecast `m`:
+
+```text
+scale   = max((q_hi - q_lo) / 2, eps * (1 + abs(m)))
+s_lower = max(0, (q_lo - y) / scale)
+s_upper = max(0, (y - q_hi) / scale)
+```
+
+Exact local score quantiles shrink toward a model/horizon parent field. This
+lets a new Crystal, route or O1 regime inherit useful calibration immediately,
+then become action-specific as its own settlements arrive.
+
+Each side follows an O1-driven adaptive conformal update:
+
+```text
+gain = base_gain * f(O1_surprise, O1_cusum)
+alpha_side <- clip(
+    alpha_side + gain * (target_tail_error - observed_tail_error)
+)
+```
+
+Undercoverage lowers `alpha` and expands the next interval. Overcoverage releases
+reserve. Surprise accelerates adaptation exactly when O1 detects that the old
+error distribution stopped describing the stream. The current target is 80%
+marginal coverage from the outer 10–90% quantiles, with a separate 80% joint
+trajectory envelope.
+
+The algorithm extends conformalized quantile regression and adaptive conformal
+inference to O1FM's route/action hierarchy. The underlying score and online
+alpha update follow established work; the persistent directed field, causal
+identity hierarchy and compute/action coupling are O1FM's architecture.
+
+References:
+
+- [Conformalized Quantile Regression](https://proceedings.neurips.cc/paper/2019/hash/5103c3584b063c431bd1268e9b5e76fb-Abstract.html)
+- [Adaptive Conformal Inference Under Distribution Shift](https://arxiv.org/abs/2106.00170)
+- [Copula Conformal Prediction for Multi-Step Time Series](https://openreview.net/pdf?id=ojIJZDNIBj)
+- [MultiDimSPCI](https://proceedings.mlr.press/v235/xu24m.html)
+
+## Mathematical constraints from the Foss papers
+
+### Temporal causality and Sinkhorn are different axes
+
+Exact bistochasticity and strict causal lower-triangular flow intersect only at
+identity. Temporal attention therefore remains causal and row-stochastic.
+Sinkhorn transport acts only across simultaneously visible variates inside an
+aligned patch. A Prefix-Usage temporal operator is a separate causal relaxation
+and must be co-trained with every layer on which it acts.
+
+### Causal transport is an additive budget
+
+For a causal row-stochastic kernel `A`, query distribution `q` and induced key
+usage `u=qA`, the exact identity
+
+```text
+W1(q, u) = sum_ij q_i A_ij (x_i - x_j)
+```
+
+makes direct backward reach and usage imbalance the same quantity. Across a
+stack these distances add without cancellation. O1FM can therefore attach risk,
+memory and compute reserves to a causal path with an exactly compositional
+transport budget.
+
+### Directed state needs more than one scalar
+
+The scalar Möbius no-go classifies every state-independent positive multiplier
+and shows that an even Lorentz-like dilation requires a two-component lift.
+O1FM applies the design consequence to uncertainty: signed lower/upper drift is
+preserved as a vector field instead of collapsed into one symmetric width.
+
+## The compilation loop
+
+```text
+teacher/local forward
+    -> calibrated trajectory ticket
+    -> realized settlement
+    -> route-specific residual and intervention evidence
+    -> additive Crystal statistics
+    -> ActionBank quality/coverage/cost receipt
+    -> O1 novelty and learning-progress update
+    -> compile, retain, replace or discard local operator
+```
+
+This differs from static TSFM distillation. DistilTS compresses one foundation
+model into one fixed student and reports up to 1/150 the parameters and 6000x
+inference acceleration. O1FM continually produces many tiny, regime- and
+intervention-specific operators and lets the foundation teacher remain the
+fallback for novelty. [DistilTS](https://arxiv.org/abs/2601.12785)
+
+## Route to the full system
+
+1. Directed O1 Conformal Field with marginal and joint receipts.
+2. Toto-2.0-22M and Chronos-2 adapters behind one teacher protocol.
+3. Factual and intervention-aware trajectory Crystals.
+4. `.causal` live Atlas records for routes, field revisions and compiled
+   response surfaces.
+5. O1 Cartographer jobs for autonomous horizon/target/action measurement.
+6. Battery policy for profitable idle-time branch charging.
+7. Markov/Seed policy learning over action, consequence, quality and work cost.
+8. Active value-of-information selection over sensors and interventions.
+
+The terminal product does not merely answer “what happens next?” It maintains a
+live executable map of what can happen, why, how confident the system is, what
+changes under intervention, and which future computation has already been paid.
+

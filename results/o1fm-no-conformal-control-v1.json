@@ -1,0 +1,118 @@
+{
+  "actions": {
+    "crystal": 6,
+    "foundation": 6,
+    "seasonal": 0,
+    "trace": [
+      "foundation",
+      "foundation",
+      "foundation",
+      "foundation",
+      "foundation",
+      "foundation",
+      "crystal",
+      "crystal",
+      "crystal",
+      "crystal",
+      "crystal",
+      "crystal"
+    ]
+  },
+  "architecture": {
+    "causal_temporal_attention": true,
+    "directed_o1_conformal_field": false,
+    "forecast_crystals": true,
+    "known_future_covariates": true,
+    "non_autoregressive_horizon": true,
+    "o1_regime_state": true,
+    "sinkhorn_variate_attention": true
+  },
+  "calibration": {
+    "direct_foundation_joint_coverage": 0.0,
+    "direct_foundation_marginal_coverage": 0.6157407407407407,
+    "direct_foundation_mean_width": 0.7737739384174347,
+    "field": null,
+    "marginal_coverage_gain": 0.0,
+    "marginal_coverage_gain_per_width": 0.0,
+    "marginal_coverage_gap_to_target": -0.2236111111111111,
+    "runtime_base_joint_coverage": 0.0,
+    "runtime_base_marginal_coverage": 0.576388888888889,
+    "runtime_base_mean_width": 0.6431781699260076,
+    "runtime_joint_coverage": null,
+    "runtime_marginal_coverage": 0.576388888888889,
+    "runtime_mean_width": 0.6431781699260076,
+    "target_coverage": 0.8,
+    "width_expansion": 0.0,
+    "width_ratio": 1.0
+  },
+  "data": {
+    "horizon": 12,
+    "online_windows": 12,
+    "regime_switch_indices": [
+      106,
+      213
+    ],
+    "target_dim": 3,
+    "train_windows": 60
+  },
+  "economics": {
+    "baseline_foundation_forwards": 12,
+    "executed_foundation_forwards": 6,
+    "forward_reduction": 0.5,
+    "saved_foundation_forwards": 6
+  },
+  "graph": {
+    "edge_count": 72,
+    "graph_identity_sha256": "38a088269e36a6672ef11011149753691b998dc414246672f9da4b04d92d4576",
+    "head_event_sha256": "cbe83b4baaaec81af3f13ecaded81babc709735233c13033e610654d2153e45a",
+    "last_timestamp_ns": 1705172400000000000,
+    "revision": 180,
+    "schema": "o1fm.causal-graph-metrics/v1",
+    "supported_edges": 55
+  },
+  "model_identity_sha256": "675d1b02ef42c306398e0534040757283293746cb982cfc3e2c2bf2642884259",
+  "o1": {
+    "bias": 0.04722738886387864,
+    "cusum": 0.0,
+    "ew_absolute_error": 0.31215608502332554,
+    "ew_normalized_error": 1.3360040343813249,
+    "head_event_sha256": "59637efbcc737999081cad5a591a7c17021bc389733a540208421e25fee6a542",
+    "identity_sha256": "57207296ab2ed98dbbe59e681fd713ead04695cdac0ceee884685ad70101f247",
+    "interval_coverage": 0.5763888888888888,
+    "learning_progress": 0.0,
+    "mae": 0.2788033017460731,
+    "mean_interval_width": 0.643178171651757,
+    "observations": 12,
+    "pinball": {
+      "0x1.0000000000000p-1": 0.1515111773597137,
+      "0x1.999999999999ap-4": 0.07532676648875673,
+      "0x1.ccccccccccccdp-1": 0.08740542271692969
+    },
+    "regime_changes": 0,
+    "regime_generation": 0,
+    "schema": "o1fm.o1-error-metrics/v1",
+    "sequence": 12,
+    "surprise": 0.1445918056152531,
+    "value_count": 432
+  },
+  "quality": {
+    "direct_foundation_mae": 0.34107590706898244,
+    "direct_foundation_pinball": 0.13345845314855384,
+    "runtime_base_pinball": 0.12313576646932727,
+    "runtime_mae": 0.2788033014620413,
+    "runtime_pinball": 0.12313576646932727,
+    "seasonal_mae": 0.24337350439573466
+  },
+  "schema": "o1fm.demo-result/v2",
+  "timing": {
+    "runtime_seconds": 7.888337374897674,
+    "training_seconds": 2.683223875006661
+  },
+  "training": {
+    "best_loss": 0.09576303698122501,
+    "epochs": 20,
+    "examples": 60,
+    "final_loss": 0.09576303698122501,
+    "first_loss": 0.15055103600025177
+  }
+}

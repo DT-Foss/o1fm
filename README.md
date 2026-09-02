@@ -19,6 +19,8 @@ multivariate history + known future covariates
       kernel      baseline       model
           └─────────┼──────────┘
                     │
+       directed O1 conformal field
+                    │
        invariant + quantile verification
                     │
              observed outcome
@@ -33,6 +35,8 @@ multivariate history + known future covariates
   head predicts the full horizon and ordered quantiles in one forward pass.
 - **Forecasting-native O1 state.** Every realized target updates normalized
   residuals, coverage, learning progress, surprise, and regime identity.
+- **Directed conformal control.** Separate lower/upper reserves and a joint
+  trajectory field adapt to O1 surprise without changing the point forecast.
 - **Causal covariate routing.** Online lagged influence scores select past-only
   and known-future signals. Topology hysteresis accepts real route changes while
   ignoring one-window score jitter.
@@ -69,6 +73,36 @@ python -m o1fm demo
 The committed receipt is [`results/o1fm-demo-v1.json`](results/o1fm-demo-v1.json),
 SHA-256 `f150251bb0a1dab3cb4512f9803d9cb1a608694967d9778b1f759349800c2c85`.
 
+## Directed calibration result
+
+The next receipt runs the same 12-window sequence through the persistent O1
+Conformal Field. Calibration uses only previously settled outcomes; new actions,
+routes and regimes inherit a pooled parent field and then accumulate exact local
+evidence.
+
+| Metric | Same selected action, raw | Directed O1 field |
+|---|---:|---:|
+| Marginal 10–90% coverage | 57.64% | **79.40%** |
+| Joint whole-trajectory coverage | 0/12 | **10/12** |
+| Mean interval width | 0.6432 | 1.1640 |
+| Mean pinball loss | 0.12314 | **0.12261** |
+| Foundation forwards | 6/12 | **6/12** |
+
+The field recovered 21.76 coverage points, finished 0.60 points from the 80%
+target, and preserved the 50% foundation-forward reduction. Its finite-sample
+`(n+1)` conformal rank, partial-label updates, O1-driven adaptive alpha and
+atomic action/route/regime state are all in the live runtime.
+
+The committed receipt is
+[`results/o1fm-directed-conformal-v1.json`](results/o1fm-directed-conformal-v1.json),
+SHA-256 `85c49fc48ea4abb70b260a81a7d7b796b7ed720dbbddbd96a35c01f7af520d7b`.
+
+An independent `--no-conformal` control reproduced the same six-foundation /
+six-Crystal action trace, 57.64% coverage and 0.12314 pinball. Its committed
+receipt is
+[`results/o1fm-no-conformal-control-v1.json`](results/o1fm-no-conformal-control-v1.json),
+SHA-256 `31c812a498dc2d8dd23263dca9e7e5eb99f5ef6053602ee71c877e444d8d272c`.
+
 ## Relationship to TimesFM
 
 Google's TimesFM-3 established the strongest current reference geometry for
@@ -97,3 +131,6 @@ python -m o1fm demo
 ```
 
 O1FM is developed by David Tom Foss.
+
+The full target architecture is documented in
+[`docs/ENDGAME.md`](docs/ENDGAME.md).

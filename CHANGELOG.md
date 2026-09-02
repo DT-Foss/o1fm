@@ -16,5 +16,11 @@
   immediate score refresh for stable routes.
 - Made partial horizon settlements train Forecast Crystals while calibration
   and error totals count only observed values.
+- Added the persistent Directed O1 Conformal Field: asymmetric lower/upper CQR
+  reserves, joint trajectory envelopes, pooled cold-profile transfer,
+  finite-sample ranks and O1 surprise/CUSUM adaptation.
+- Integrated calibration into every runtime action and ActionBank shadow score.
+  The live receipt raises coverage 57.64% → 79.40%, reaches 10/12 joint path
+  coverage, slightly improves pinball, and preserves the 50% forward reduction.
 - Added the end-to-end CLI proof: 6 of 12 foundation forwards replaced by
   Forecast Crystals, MAE 0.3411 → 0.2788, pinball 0.1335 → 0.1231.
