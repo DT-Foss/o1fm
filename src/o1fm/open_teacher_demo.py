@@ -15,6 +15,7 @@ import numpy as np
 import torch
 
 from .action_bank import ActionBank
+from .atlas import ForecastAtlas
 from .causal_graph import CausalGraphConfig, OnlineCausalGraph
 from .conformal import ConformalFieldConfig, O1ConformalField
 from .crystals import ForecastCrystalBank
@@ -116,6 +117,7 @@ def _run_policy(
     local_forward_cost: float = 0.0,
     quality_tolerance: float = 0.005,
     coverage_tolerance: float = 0.05,
+    atlas: ForecastAtlas | None = None,
 ) -> dict[str, object]:
     field = O1ConformalField(
         root / "conformal",
@@ -160,6 +162,7 @@ def _run_policy(
         foundation_refresh_interval=4,
         seasonal_period=seasonal_period,
         enable_seasonal=local_actions and local_teacher is None,
+        atlas=atlas,
     )
     started = time.perf_counter()
     actions: list[str] = []
@@ -170,10 +173,19 @@ def _run_policy(
     forwards = 0
     local_forwards = 0
     forced_refreshes = 0
+    profiles = set()
+    atlas_receipts = []
     for example in online:
         ticket = runtime.forecast(example.inputs)
         settlement = runtime.settle(ticket, example.require_target())
         actions.append(ticket.action)
+        profiles.add(ticket.profile)
+        for receipt in (
+            ticket.atlas_forecast_receipt,
+            ticket.atlas_transport_receipt,
+        ):
+            if receipt is not None:
+                atlas_receipts.append(receipt)
         route_transport.append(ticket.route.transport_w1)
         scores.append(settlement.score)
         base_scores.append(settlement.base_score)
@@ -182,7 +194,40 @@ def _run_policy(
         forwards += settlement.foundation_forwards
         local_forwards += settlement.local_forwards
         forced_refreshes += int(settlement.forced_foundation_refresh)
+        if settlement.atlas_settlement_receipt is not None:
+            atlas_receipts.append(settlement.atlas_settlement_receipt)
     elapsed = time.perf_counter() - started
+    verified: dict[str, dict[str, float | int]] = {}
+    for profile in profiles:
+        for action, stats in runtime.actions.describe(profile).items():
+            row = verified.setdefault(
+                action,
+                {
+                    "coverage_sum": 0.0,
+                    "forward_cost_sum": 0.0,
+                    "quality_sum": 0.0,
+                    "support": 0,
+                },
+            )
+            row["support"] = int(row["support"]) + stats.support
+            row["coverage_sum"] = float(row["coverage_sum"]) + (
+                stats.mean_coverage * stats.support
+            )
+            row["forward_cost_sum"] = float(row["forward_cost_sum"]) + (
+                stats.mean_forward_cost * stats.support
+            )
+            row["quality_sum"] = float(row["quality_sum"]) + (
+                stats.mean_quality * stats.support
+            )
+    verified_actions = {
+        action: {
+            "mean_coverage": float(row["coverage_sum"]) / int(row["support"]),
+            "mean_forward_cost": float(row["forward_cost_sum"]) / int(row["support"]),
+            "mean_quality": float(row["quality_sum"]) / int(row["support"]),
+            "support": int(row["support"]),
+        }
+        for action, row in sorted(verified.items())
+    }
     return {
         "actions": {
             "counts": {
@@ -191,6 +236,24 @@ def _run_policy(
             },
             "trace": actions,
         },
+        "atlas": (
+            None
+            if atlas is None
+            else {
+                "receipts": [
+                    {
+                        "kind": receipt.kind,
+                        "record_count": receipt.record_count,
+                        "revision_sequence": receipt.revision_sequence,
+                        "revision_sha256": receipt.revision_sha256,
+                        "segment_sha256": receipt.segment_sha256,
+                    }
+                    for receipt in atlas_receipts
+                ],
+                "revision": list(atlas.store.revision()),
+                "verified": atlas.verify(),
+            }
+        ),
         "base_quality": _score_summary(base_scores),
         "calibrated_quality": _score_summary(scores),
         "conformal": field.metrics(),
@@ -205,6 +268,7 @@ def _run_policy(
         "joint_coverage": None if not joint else _mean(joint),
         "o1": runtime.o1.metrics(),
         "runtime_seconds": elapsed,
+        "verified_actions": verified_actions,
     }
 
 
@@ -216,6 +280,7 @@ def run_open_teacher_demo(
     enable_local_teacher: bool = True,
     quality_tolerance: float = 0.005,
     coverage_tolerance: float = 0.05,
+    atlas_dir: str | Path | None = None,
     device: str = "cpu",
     seed: int = 23,
     state_dir: str | Path | None = None,
@@ -309,6 +374,7 @@ def run_open_teacher_demo(
             else Path(state_dir).expanduser().absolute()
         )
         root.mkdir(parents=True, exist_ok=True)
+        atlas = None if atlas_dir is None else ForecastAtlas.from_immer(atlas_dir)
         control = _run_policy(
             teacher,
             online,
@@ -318,6 +384,7 @@ def run_open_teacher_demo(
             local_actions=False,
             quality_tolerance=quality_tolerance,
             coverage_tolerance=coverage_tolerance,
+            atlas=None,
         )
         adaptive = _run_policy(
             teacher,
@@ -330,6 +397,7 @@ def run_open_teacher_demo(
             local_forward_cost=local_forward_cost,
             quality_tolerance=quality_tolerance,
             coverage_tolerance=coverage_tolerance,
+            atlas=atlas,
         )
 
     windows = len(online)

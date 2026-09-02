@@ -1,6 +1,7 @@
 """O1FM: continuous causal forecasting with stored compute."""
 
 from .action_bank import ActionBank, ActionProfileKey, ActionReceipt
+from .atlas import AtlasReceipt, ForecastAtlas, SegmentStore
 from .attention import (
     CrossVariateSinkhornAttention,
     ForecastBlock,
@@ -68,6 +69,7 @@ __all__ = [
     "ActionBank",
     "ActionProfileKey",
     "ActionReceipt",
+    "AtlasReceipt",
     "CanonicalIdentity",
     "CausalEdge",
     "CausalGraphConfig",
@@ -84,6 +86,7 @@ __all__ = [
     "FEATURE_ABI",
     "ForecastBatch",
     "ForecastBlock",
+    "ForecastAtlas",
     "ForecastCrystalBank",
     "ForecastCrystalKey",
     "ForecastExample",
@@ -109,6 +112,7 @@ __all__ = [
     "RMSNorm",
     "RouteTransportResult",
     "SeasonalNaiveForecaster",
+    "SegmentStore",
     "SwiGLU",
     "SyntheticConfig",
     "SyntheticDataset",

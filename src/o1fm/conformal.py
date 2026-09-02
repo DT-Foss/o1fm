@@ -1123,6 +1123,7 @@ class O1ConformalField:
         *,
         surprise: float,
         cusum: float,
+        update_pool: bool,
     ) -> str:
         base = application.base_prediction
         return sha256_json(
@@ -1154,6 +1155,7 @@ class O1ConformalField:
                 "cusum": _hex(cusum),
                 "key": key.to_record(),
                 "surprise": _hex(surprise),
+                "update_pool": update_pool,
                 "target": {
                     "mask": np.asarray(target.mask).tolist(),
                     "series_id": target.series_id,
@@ -1239,6 +1241,7 @@ class O1ConformalField:
         surprise: float = 0.0,
         cusum: float = 0.0,
         observation_id: str | None = None,
+        update_pool: bool = True,
     ) -> ConformalUpdate:
         """Settle one forecast and atomically update exact and pooled fields."""
 
@@ -1248,6 +1251,8 @@ class O1ConformalField:
             raise TypeError("application must be ConformalApplication")
         if not isinstance(target, ForecastTarget):
             raise TypeError("target must be ForecastTarget")
+        if not isinstance(update_pool, bool):
+            raise TypeError("update_pool must be boolean")
         if application.key != key:
             raise ValueError("application belongs to a different conformal key")
         base = application.base_prediction
@@ -1268,6 +1273,7 @@ class O1ConformalField:
             target,
             surprise=surprise_value,
             cusum=cusum_value,
+            update_pool=update_pool,
         )
         lower_index, upper_index = self._quantile_indexes(key, base)
         base_quantiles = np.asarray(base.quantiles, dtype=np.float64)
@@ -1345,19 +1351,20 @@ class O1ConformalField:
                 width_expansion=width_expansion,
                 gain=gain,
             )
-            self._append_profile(
-                pooled,
-                lower_scores=lower_scores,
-                upper_scores=upper_scores,
-                mask=mask,
-                joint_score=joint_score,
-                lower_misses=int(lower_miss_mask.sum()),
-                upper_misses=int(upper_miss_mask.sum()),
-                marginal_hits=marginal_hits,
-                joint_hit=joint_hit,
-                width_expansion=width_expansion,
-                gain=gain,
-            )
+            if update_pool:
+                self._append_profile(
+                    pooled,
+                    lower_scores=lower_scores,
+                    upper_scores=upper_scores,
+                    mask=mask,
+                    joint_score=joint_score,
+                    lower_misses=int(lower_miss_mask.sum()),
+                    upper_misses=int(upper_miss_mask.sum()),
+                    marginal_hits=marginal_hits,
+                    joint_hit=joint_hit,
+                    width_expansion=width_expansion,
+                    gain=gain,
+                )
             update = ConformalUpdate(
                 observation_id=observation_id,
                 content_sha256=content_sha256,

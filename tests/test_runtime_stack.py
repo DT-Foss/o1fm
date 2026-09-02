@@ -1,17 +1,20 @@
 from __future__ import annotations
 
+import json
 from pathlib import Path
 
 import numpy as np
 import torch
 
 from o1fm.action_bank import ActionBank
+from o1fm.atlas import ForecastAtlas
 from o1fm.baselines import SeasonalNaiveForecaster
 from o1fm.causal_graph import CausalEdge, CausalGraphConfig, OnlineCausalGraph
 from o1fm.conformal import O1ConformalField
 from o1fm.contracts import ForecastInputs, ForecastPrediction, ForecastTarget
 from o1fm.crystals import ForecastCrystalBank
 from o1fm.features import extract_features, feature_schema
+from o1fm.identity import canonical_json_bytes, sha256_bytes, sha256_json
 from o1fm.metrics import score_prediction
 from o1fm.model import ForecastResult, O1FMConfig, O1FMForecaster
 from o1fm.o1 import O1Config, O1ErrorStream
@@ -292,6 +295,34 @@ class InjectedTeacher:
         )
 
 
+class MemorySegmentStore:
+    def __init__(self) -> None:
+        self.rows = {}
+        self.sequence = 0
+        self.head = "0" * 64
+
+    def append_segment(self, records):
+        materialized = tuple(json.loads(canonical_json_bytes(row)) for row in records)
+        body = b"".join(canonical_json_bytes(row) + b"\n" for row in materialized)
+        digest = sha256_bytes(body)
+        if digest not in self.rows:
+            self.rows[digest] = materialized
+            self.sequence += 1
+            self.head = sha256_json(
+                {"previous": self.head, "segment": digest, "sequence": self.sequence}
+            )
+        return digest
+
+    def revision(self):
+        return self.sequence, self.head
+
+    def record(self, sha, index):
+        return self.rows[sha][index]
+
+    def verify(self):
+        return True
+
+
 def test_runtime_accepts_external_forecast_teacher(tmp_path: Path) -> None:
     teacher = InjectedTeacher()
     runtime = O1FMRuntime(
@@ -393,3 +424,62 @@ def test_runtime_forces_periodic_foundation_refresh(tmp_path: Path) -> None:
         False,
         True,
     ]
+
+
+def test_runtime_shadow_calibrates_local_candidate_without_pool_duplication(
+    tmp_path: Path,
+) -> None:
+    foundation = InjectedTeacher()
+    field = O1ConformalField(tmp_path / "field-shadow")
+    runtime = O1FMRuntime(
+        foundation,
+        model_identity="e" * 64,
+        o1=O1ErrorStream(tmp_path / "o1-shadow.json", stream_id="series-a"),
+        graph=OnlineCausalGraph(tmp_path / "graph-shadow", graph_id="series-a"),
+        crystals=ForecastCrystalBank(
+            tmp_path / "crystals-shadow.json",
+            quantile_levels=foundation.quantile_levels,
+        ),
+        actions=ActionBank(tmp_path / "actions-shadow.json", min_support=1),
+        conformal=field,
+        local_teacher=InjectedTeacher(),
+        enable_seasonal=False,
+    )
+    ticket = runtime.forecast(_inputs())
+    settlement = runtime.settle(ticket, _target(_inputs(), value=5.0))
+
+    assert ticket.action == "foundation"
+    assert set(settlement.shadow_calibration_updates) == {"local"}
+    assert field.metrics()["exact_profile_count"] == 2
+    assert field.metrics()["pooled_profile_count"] == 1
+
+
+def test_runtime_emits_direct_forecast_transport_and_settlement_citations(
+    tmp_path: Path,
+) -> None:
+    store = MemorySegmentStore()
+    atlas = ForecastAtlas(store)
+    foundation = InjectedTeacher()
+    runtime = O1FMRuntime(
+        foundation,
+        model_identity="f" * 64,
+        o1=O1ErrorStream(tmp_path / "o1-atlas.json", stream_id="series-a"),
+        graph=OnlineCausalGraph(tmp_path / "graph-atlas", graph_id="series-a"),
+        crystals=ForecastCrystalBank(
+            tmp_path / "crystals-atlas.json",
+            quantile_levels=foundation.quantile_levels,
+        ),
+        actions=ActionBank(tmp_path / "actions-atlas.json"),
+        atlas=atlas,
+        enable_seasonal=False,
+    )
+    ticket = runtime.forecast(_inputs())
+    settlement = runtime.settle(ticket, _target(_inputs()))
+
+    assert ticket.atlas_forecast_receipt is not None
+    assert ticket.atlas_transport_receipt is not None
+    assert settlement.atlas_settlement_receipt is not None
+    assert store.sequence == 3
+    assert atlas.record(ticket.atlas_forecast_receipt)["kind"] == "forecast"
+    assert atlas.record(ticket.atlas_transport_receipt)["kind"] == "transport"
+    assert atlas.record(settlement.atlas_settlement_receipt)["kind"] == "settlement"

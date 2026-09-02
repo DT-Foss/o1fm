@@ -5,11 +5,12 @@ from __future__ import annotations
 import math
 import time
 from collections.abc import Mapping
-from dataclasses import dataclass
+from dataclasses import dataclass, replace
 
 import numpy as np
 
 from .action_bank import ActionBank, ActionProfileKey, ActionReceipt
+from .atlas import AtlasReceipt, ForecastAtlas
 from .baselines import SeasonalNaiveForecaster
 from .causal_graph import CausalEdge, OnlineCausalGraph
 from .conformal import (
@@ -52,6 +53,7 @@ class ForecastTicket:
     prediction: ForecastPrediction
     base_prediction: ForecastPrediction
     calibration: ConformalApplication | None
+    local_base_prediction: ForecastPrediction | None
     action: str
     profile: ActionProfileKey
     crystal_key: ForecastCrystalKey
@@ -65,6 +67,9 @@ class ForecastTicket:
     regime: str
     candidates: Mapping[str, tuple[ForecastPrediction, float]]
     candidate_forward_costs: Mapping[str, float]
+    candidate_calibrations: Mapping[str, ConformalApplication]
+    atlas_forecast_receipt: AtlasReceipt | None
+    atlas_transport_receipt: AtlasReceipt | None
 
 
 @dataclass(frozen=True, slots=True)
@@ -75,6 +80,7 @@ class ForecastSettlement:
     base_score: ForecastScore
     o1_update: O1Update
     calibration_update: ConformalUpdate | None
+    shadow_calibration_updates: Mapping[str, ConformalUpdate]
     joint_covered: bool | None
     crystal_ready: bool
     forward_cost: float
@@ -82,6 +88,7 @@ class ForecastSettlement:
     local_forwards: int
     forced_foundation_refresh: bool
     saved_foundation_forwards: int
+    atlas_settlement_receipt: AtlasReceipt | None
 
 
 def _prediction_from_crystal(
@@ -116,6 +123,7 @@ class O1FMRuntime:
         local_teacher: ForecastTeacher | None = None,
         local_forward_cost: float = 0.25,
         foundation_refresh_interval: int | None = 8,
+        atlas: ForecastAtlas | None = None,
         seasonal_period: int = 24,
         route_top_k: int = 8,
         route_stability: int = 3,
@@ -168,6 +176,8 @@ class O1FMRuntime:
             or foundation_refresh_interval <= 0
         ):
             raise ValueError("foundation_refresh_interval must be positive or None")
+        if atlas is not None and not isinstance(atlas, ForecastAtlas):
+            raise TypeError("atlas must be ForecastAtlas or None")
         self.model = model
         self.teacher = teacher
         self.model_identity = model_identity
@@ -184,6 +194,7 @@ class O1FMRuntime:
         self.local_teacher = local_teacher
         self.local_forward_cost = float(local_forward_cost)
         self.foundation_refresh_interval = foundation_refresh_interval
+        self.atlas = atlas
         self.seasonal = SeasonalNaiveForecaster(
             period=seasonal_period,
             quantile_levels=crystals.quantile_levels,
@@ -363,12 +374,36 @@ class O1FMRuntime:
             selected_known=route.known_indices,
             seasonal_period=self.seasonal_period,
         )
-        schema = sha256_json(
-            {
-                "base_feature_schema": base_schema,
-                "route_transport": "o1fm.normalized-route-w1/v1",
+        local_base = None
+        local_started = None
+        local_identity = None
+        if self.local_teacher is not None:
+            local_started = time.perf_counter()
+            local_base = self.local_teacher.predict(inputs)
+            raw_identity = getattr(self.local_teacher, "identity", None)
+            local_identity = (
+                raw_identity
+                if isinstance(raw_identity, str) and len(raw_identity) == 64
+                else sha256_json(
+                    {
+                        "class": (
+                            f"{type(self.local_teacher).__module__}."
+                            f"{type(self.local_teacher).__qualname__}"
+                        ),
+                        "quantiles": list(self.local_teacher.quantile_levels),
+                    }
+                )
+            )
+        schema_record: dict[str, object] = {
+            "base_feature_schema": base_schema,
+            "route_transport": "o1fm.normalized-route-w1/v1",
+        }
+        if local_identity is not None:
+            schema_record["local_residual_base"] = {
+                "identity": local_identity,
+                "schema": "o1fm.local-teacher-residual/v1",
             }
-        )
+        schema = sha256_json(schema_record)
         base_features = extract_features(
             inputs,
             selected_past=route.past_indices,
@@ -392,16 +427,15 @@ class O1FMRuntime:
         candidate_calibrations: dict[str, ConformalApplication] = {}
         candidate_forward_costs: dict[str, float] = {}
 
-        if self.local_teacher is not None:
-            started = time.perf_counter()
-            local_base = self.local_teacher.predict(inputs)
+        if local_base is not None:
+            assert local_started is not None
             local_calibration = self._calibrate(profile, "local", local_base)
             local = (
                 local_base
                 if local_calibration is None
                 else local_calibration.prediction
             )
-            candidates["local"] = (local, time.perf_counter() - started)
+            candidates["local"] = (local, time.perf_counter() - local_started)
             candidate_forward_costs["local"] = self.local_forward_cost
             if local_calibration is not None:
                 candidate_calibrations["local"] = local_calibration
@@ -425,7 +459,12 @@ class O1FMRuntime:
                 candidate_calibrations["seasonal"] = seasonal_calibration
 
         started = time.perf_counter()
-        crystal_raw = self.crystals.predict(crystal_key, features, regime=regime)
+        crystal_raw = self.crystals.predict(
+            crystal_key,
+            features,
+            base_point=None if local_base is None else local_base.point,
+            regime=regime,
+        )
         if crystal_raw is not None:
             crystal_base = _prediction_from_crystal(inputs, crystal_raw)
             crystal_calibration = self._calibrate(
@@ -441,7 +480,9 @@ class O1FMRuntime:
                 ),
                 time.perf_counter() - started,
             )
-            candidate_forward_costs["crystal"] = 0.0
+            candidate_forward_costs["crystal"] = (
+                0.0 if local_base is None else self.local_forward_cost
+            )
             if crystal_calibration is not None:
                 candidate_calibrations["crystal"] = crystal_calibration
 
@@ -493,12 +534,13 @@ class O1FMRuntime:
                 "series_id": inputs.series_id,
             }
         )
-        return ForecastTicket(
+        ticket = ForecastTicket(
             ticket_id=ticket_id,
             inputs=inputs,
             prediction=prediction,
             base_prediction=base_prediction,
             calibration=calibration,
+            local_base_prediction=local_base,
             action=action,
             profile=profile,
             crystal_key=crystal_key,
@@ -512,7 +554,17 @@ class O1FMRuntime:
             regime=regime,
             candidates=candidates,
             candidate_forward_costs=candidate_forward_costs,
+            candidate_calibrations=candidate_calibrations,
+            atlas_forecast_receipt=None,
+            atlas_transport_receipt=None,
         )
+        if self.atlas is not None:
+            ticket = replace(
+                ticket,
+                atlas_forecast_receipt=self.atlas.append_forecast(ticket),
+                atlas_transport_receipt=self.atlas.append_transport(ticket),
+            )
+        return ticket
 
     def _settle_graph(self, ticket: ForecastTicket, target: ForecastTarget) -> None:
         history = ticket.inputs.history_length
@@ -566,6 +618,7 @@ class O1FMRuntime:
             observation_id=f"ticket:{ticket.ticket_id}",
         )
         calibration_update = None
+        shadow_calibration_updates: dict[str, ConformalUpdate] = {}
         if self.conformal is not None and ticket.calibration is not None:
             calibration_update = self.conformal.observe(
                 ticket.calibration.key,
@@ -575,6 +628,19 @@ class O1FMRuntime:
                 cusum=update.cusum,
                 observation_id=f"ticket:{ticket.ticket_id}",
             )
+        if self.conformal is not None:
+            for action, candidate_calibration in ticket.candidate_calibrations.items():
+                if action == ticket.action:
+                    continue
+                shadow_calibration_updates[action] = self.conformal.observe(
+                    candidate_calibration.key,
+                    candidate_calibration,
+                    target,
+                    surprise=update.surprise,
+                    cusum=update.cusum,
+                    observation_id=(f"ticket:{ticket.ticket_id}:candidate:{action}"),
+                    update_pool=False,
+                )
         crystal_stats = self.crystals.observe(
             ticket.crystal_key,
             ticket.features,
@@ -582,6 +648,11 @@ class O1FMRuntime:
             future_target_mask=target.mask,
             fit_target=(
                 ticket.base_prediction.point if self.compile_teacher_crystals else None
+            ),
+            base_point=(
+                None
+                if ticket.local_base_prediction is None
+                else ticket.local_base_prediction.point
             ),
             update_fit=(
                 not self.compile_teacher_crystals
@@ -631,13 +702,14 @@ class O1FMRuntime:
                     latency,
                     ticket.candidate_forward_costs[action],
                 )
-        return ForecastSettlement(
+        settlement = ForecastSettlement(
             ticket_id=ticket.ticket_id,
             action=ticket.action,
             score=score,
             base_score=base_score,
             o1_update=update,
             calibration_update=calibration_update,
+            shadow_calibration_updates=shadow_calibration_updates,
             joint_covered=(
                 None if calibration_update is None else calibration_update.joint_hit
             ),
@@ -647,7 +719,17 @@ class O1FMRuntime:
             local_forwards=ticket.local_forwards,
             forced_foundation_refresh=ticket.forced_foundation_refresh,
             saved_foundation_forwards=int(ticket.action != "foundation"),
+            atlas_settlement_receipt=None,
         )
+        if self.atlas is not None:
+            settlement = replace(
+                settlement,
+                atlas_settlement_receipt=self.atlas.append_settlement(
+                    ticket,
+                    settlement,
+                ),
+            )
+        return settlement
 
 
 __all__ = [

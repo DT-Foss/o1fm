@@ -164,6 +164,27 @@ def test_pooled_evidence_transfers_to_new_action_graph_and_regime(
     assert field.metrics()["pooled_profile_count"] == 1
 
 
+def test_shadow_settlement_updates_exact_field_without_parent_pool(
+    tmp_path: Path,
+) -> None:
+    field = O1ConformalField(tmp_path)
+    foundation = _key(action="foundation")
+    local = _key(action="local", graph_revision="graph:002", regime="shift:1")
+    base = _prediction()
+    field.observe(
+        foundation,
+        field.apply(foundation, base),
+        _target([[5.0, 5.0], [5.0, 5.0]]),
+        observation_id="shadow-foundation",
+        update_pool=False,
+    )
+
+    exact = field.apply(foundation, base)
+    inherited = field.apply(local, base)
+    assert bool((exact.upper_expansion > 0.0).all())
+    assert np.count_nonzero(inherited.upper_expansion) == 0
+
+
 def test_partial_mask_counts_observed_cells_and_persists_null_history(
     tmp_path: Path,
 ) -> None:

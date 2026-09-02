@@ -577,6 +577,7 @@ class ForecastCrystalBank:
         key: ForecastCrystalKey,
         features: object,
         *,
+        base_point: object | None = None,
         regime: str | None = None,
         quantile_levels: Sequence[object] | None = None,
     ) -> ForecastCrystalPrediction | None:
@@ -596,7 +597,17 @@ class ForecastCrystalBank:
             else _quantile_levels(quantile_levels)
         )
         vector = _feature_vector(features, expected_size=state.feature_dim)
-        point_flat = self._predict_flat(state, vector)
+        base_flat = (
+            np.zeros(key.output_dim, dtype=np.float64)
+            if base_point is None
+            else _future_matrix(
+                base_point,
+                horizon=key.horizon,
+                target_count=key.target_count,
+                mask=None,
+            ).reshape(key.output_dim)
+        )
+        point_flat = base_flat + self._predict_flat(state, vector)
         quantile_map = self._quantiles_for(state, point_flat, levels)
         shape = (key.horizon, key.target_count)
         return ForecastCrystalPrediction(
@@ -623,6 +634,7 @@ class ForecastCrystalBank:
         future_target_mask: object | None = None,
         fit_target: object | None = None,
         fit_target_mask: object | None = None,
+        base_point: object | None = None,
         update_fit: bool = True,
         regime: str | None = None,
     ) -> ForecastCrystalStats:
@@ -669,6 +681,16 @@ class ForecastCrystalBank:
         observed_flat = observed_mask.reshape(key.output_dim)
         observed_count = int(np.count_nonzero(observed_flat))
         actual_flat = future.reshape(key.output_dim)
+        base_flat = (
+            np.zeros(key.output_dim, dtype=np.float64)
+            if base_point is None
+            else _future_matrix(
+                base_point,
+                horizon=key.horizon,
+                target_count=key.target_count,
+                mask=None,
+            ).reshape(key.output_dim)
+        )
         if fit_target is None:
             fit_future = future
             fit_mask = observed_mask
@@ -684,13 +706,18 @@ class ForecastCrystalBank:
                 horizon=key.horizon,
                 target_count=key.target_count,
             )
-        fit_flat = fit_future.reshape(key.output_dim)
+        fit_flat = fit_future.reshape(key.output_dim) - base_flat
         fit_observed_flat = fit_mask.reshape(key.output_dim)
         if state.support > 0:
-            point_before = self._predict_flat(state, vector)
-            target_flat = np.where(fit_observed_flat, fit_flat, point_before)
+            residual_before = self._predict_flat(state, vector)
+            point_before = base_flat + residual_before
+            target_flat = np.where(
+                fit_observed_flat,
+                fit_flat,
+                residual_before,
+            )
         else:
-            point_before = np.zeros(key.output_dim, dtype=np.float64)
+            point_before = base_flat
             target_flat = np.where(fit_observed_flat, fit_flat, 0.0)
 
         if state.support > 0 and observed_count > 0:

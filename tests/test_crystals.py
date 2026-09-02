@@ -288,3 +288,36 @@ def test_crystal_bank_compiles_fit_target_and_scores_realized_residuals(
         fit_target=[[100.0], [200.0]],
     )
     assert coverage_stats.empirical_coverage == 1.0
+
+
+def test_crystal_bank_compiles_residual_over_local_base(tmp_path: Path) -> None:
+    bank = ForecastCrystalBank(
+        tmp_path / "residual.json",
+        ridge=1e-6,
+        min_support=2,
+        min_sequential_support=1,
+        quantile_levels=(0.1, 0.5, 0.9),
+    )
+    key = _key()
+    bank.observe(
+        key,
+        [0.0],
+        [[11.0], [12.0]],
+        fit_target=[[11.0], [12.0]],
+        base_point=[[10.0], [10.0]],
+    )
+    bank.observe(
+        key,
+        [1.0],
+        [[22.0], [24.0]],
+        fit_target=[[22.0], [24.0]],
+        base_point=[[20.0], [20.0]],
+    )
+
+    prediction = bank.predict(
+        key,
+        [2.0],
+        base_point=[[30.0], [30.0]],
+    )
+    assert prediction is not None
+    np.testing.assert_allclose(prediction.point, [[33.0], [36.0]], atol=1e-3)

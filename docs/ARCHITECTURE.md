@@ -75,6 +75,19 @@ row-stochastic, while exact Sinkhorn transport is applied only across
 simultaneously visible variates. Exact bistochastic causal temporal attention
 would collapse to identity.
 
+## Citable `.causal` Atlas
+
+`ForecastAtlas` adapts any content-addressed `SegmentStore` and lazily mounts
+IMMER's `LiveStore` when requested. Forecast, normalized route transport and
+settlement are separate immutable segments with exact direct citations.
+Forecast records contain identities and array hashes, never raw model weights;
+settlement records contain scores and state-transition hashes, never raw
+targets. The normal O1FM import has no IMMER dependency.
+
+The real Toto run writes 72 unique segments and reaches authenticated manifest
+revision 72. A fresh process remounts the store, verifies the journal and every
+segment, then resolves the first forecast record directly from its receipt.
+
 ## Forecast backbone
 
 Let `x[b,v,n,p]` be a batch of `p`-step patches for `v` target/covariate

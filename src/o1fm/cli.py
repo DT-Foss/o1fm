@@ -39,6 +39,7 @@ def build_parser() -> argparse.ArgumentParser:
     teacher.add_argument("--quality-tolerance", type=float, default=0.005)
     teacher.add_argument("--coverage-tolerance", type=float, default=0.05)
     teacher.add_argument("--state-dir")
+    teacher.add_argument("--atlas-dir")
     teacher.add_argument("--output", help="optional JSON result path")
     return parser
 
@@ -63,6 +64,7 @@ def main(argv: Sequence[str] | None = None) -> int:
             quality_tolerance=args.quality_tolerance,
             coverage_tolerance=args.coverage_tolerance,
             state_dir=args.state_dir,
+            atlas_dir=args.atlas_dir,
         )
     else:  # pragma: no cover - argparse owns commands.
         raise AssertionError("unsupported command")

@@ -92,9 +92,7 @@ class AtlasReceipt:
                 "record_count must be a positive bounded integer"
             )
         if self.kind not in _KINDS:
-            raise ForecastAtlasValidationError(
-                f"kind must be one of {sorted(_KINDS)}"
-            )
+            raise ForecastAtlasValidationError(f"kind must be one of {sorted(_KINDS)}")
 
 
 def _field(value: object, name: str) -> object:
@@ -504,7 +502,9 @@ def _conformal_update(value: object | None) -> dict[str, object] | None:
 
 
 def _segment_sha(records: tuple[dict[str, object], ...]) -> str:
-    return sha256_bytes(b"".join(canonical_json_bytes(record) + b"\n" for record in records))
+    return sha256_bytes(
+        b"".join(canonical_json_bytes(record) + b"\n" for record in records)
+    )
 
 
 class ForecastAtlas:
@@ -575,9 +575,7 @@ class ForecastAtlas:
             "selected": _score(_field(settlement, "score")),
         }
         o1 = _o1_update(_field(settlement, "o1_update"))
-        conformal = _conformal_update(
-            getattr(settlement, "calibration_update", None)
-        )
+        conformal = _conformal_update(getattr(settlement, "calibration_update", None))
         costs = {
             "forced_foundation_refresh": _boolean(
                 _field(settlement, "forced_foundation_refresh"),
@@ -651,12 +649,16 @@ class ForecastAtlas:
             "trigger_key": f"o1fm:profile:{context['profile_sha256']}",
         }
 
-    def _append(self, records: tuple[dict[str, object], ...], *, kind: str) -> AtlasReceipt:
+    def _append(
+        self, records: tuple[dict[str, object], ...], *, kind: str
+    ) -> AtlasReceipt:
         if not records or kind not in _KINDS:
             raise ForecastAtlasValidationError("Atlas append is invalid")
         normalized = tuple(_canonical_copy(record) for record in records)
         assert all(isinstance(record, dict) for record in normalized)
-        canonical_records = tuple(record for record in normalized if isinstance(record, dict))
+        canonical_records = tuple(
+            record for record in normalized if isinstance(record, dict)
+        )
         expected_sha = _segment_sha(canonical_records)
         before_sequence, before_sha = self._revision()
         actual_sha = self.store.append_segment(canonical_records)
@@ -665,12 +667,16 @@ class ForecastAtlas:
         except IdentityError as exc:
             raise ForecastAtlasIntegrityError(str(exc)) from exc
         if actual_sha != expected_sha:
-            raise ForecastAtlasIntegrityError("store returned the wrong segment identity")
+            raise ForecastAtlasIntegrityError(
+                "store returned the wrong segment identity"
+            )
         after_sequence, after_sha = self._revision()
         if after_sequence < before_sequence:
             raise ForecastAtlasIntegrityError("store revision moved backwards")
         if after_sequence == before_sequence and after_sha != before_sha:
-            raise ForecastAtlasIntegrityError("unchanged revision sequence changed hash")
+            raise ForecastAtlasIntegrityError(
+                "unchanged revision sequence changed hash"
+            )
         if after_sequence > before_sequence and after_sha == before_sha:
             raise ForecastAtlasIntegrityError("advanced revision reused its prior hash")
         for index, expected in enumerate(canonical_records):
@@ -729,7 +735,11 @@ class ForecastAtlas:
     def record(self, receipt: AtlasReceipt, index: int = 0) -> Mapping[str, Any]:
         if not isinstance(receipt, AtlasReceipt):
             raise TypeError("receipt must be AtlasReceipt")
-        if isinstance(index, bool) or not isinstance(index, int) or not 0 <= index < receipt.record_count:
+        if (
+            isinstance(index, bool)
+            or not isinstance(index, int)
+            or not 0 <= index < receipt.record_count
+        ):
             raise ForecastAtlasValidationError("record index is outside the receipt")
         try:
             record = self.store.record(receipt.segment_sha256, index)
@@ -758,7 +768,12 @@ class ForecastAtlas:
                 for record in normalized
             ):
                 return False
-            return _segment_sha(tuple(record for record in normalized if isinstance(record, dict))) == receipt.segment_sha256
+            return (
+                _segment_sha(
+                    tuple(record for record in normalized if isinstance(record, dict))
+                )
+                == receipt.segment_sha256
+            )
         except Exception:
             return False
 

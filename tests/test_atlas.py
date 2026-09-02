@@ -318,7 +318,9 @@ def test_receipt_validation_and_citation_bounds_are_strict() -> None:
         atlas.record(receipt, 1)
 
 
-def test_from_immer_is_a_lazy_optional_dependency(monkeypatch: pytest.MonkeyPatch) -> None:
+def test_from_immer_is_a_lazy_optional_dependency(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
     real_import = builtins.__import__
 
     def blocked_import(name: str, *args: object, **kwargs: object) -> object:

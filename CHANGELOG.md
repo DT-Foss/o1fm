@@ -20,8 +20,8 @@
   reserves, joint trajectory envelopes, pooled cold-profile transfer,
   finite-sample ranks and O1 surprise/CUSUM adaptation.
 - Integrated calibration into every runtime action and ActionBank shadow score.
-  The live receipt raises coverage 57.64% → 79.40%, reaches 10/12 joint path
-  coverage, slightly improves pinball, and preserves the 50% forward reduction.
+  The live receipt raises coverage 57.64% → 79.86%, reaches 11/12 joint path
+  coverage, and preserves the 50% forward reduction.
 - Added the end-to-end CLI proof: 6 of 12 foundation forwards replaced by
   Forecast Crystals, MAE 0.3411 → 0.2788, pinball 0.1335 → 0.1231.
 - Added lazy native/Toto-2/Chronos-2 teacher adapters and removed the runtime's
@@ -34,6 +34,9 @@
 - Implemented the exact Foss causal-transport identity and stack geodesic check,
   then wired normalized per-target route `W1` into Crystal features and result
   receipts without fragmenting topology identities.
+- Added the optional `.causal` Forecast Atlas over IMMER LiveStore. The real
+  Toto run commits and remount-verifies 72 directly citable forecast,
+  transport and settlement segments without raw targets or weights.
 - Batched causal-graph history append into one reload and directory sync per
   forecast while preserving byte-identical event revisions and graph edges.
 - Added explicit Crystal fitting modes: native O1FM learns realized local

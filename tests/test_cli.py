@@ -49,6 +49,8 @@ def test_teacher_demo_dispatches_local_and_policy_controls(
                 "0.004",
                 "--coverage-tolerance",
                 "0.02",
+                "--atlas-dir",
+                "/tmp/o1fm-atlas",
             ]
         )
         == 0
@@ -58,4 +60,5 @@ def test_teacher_demo_dispatches_local_and_policy_controls(
     assert captured["enable_local_teacher"] is True
     assert captured["quality_tolerance"] == 0.004
     assert captured["coverage_tolerance"] == 0.02
+    assert captured["atlas_dir"] == "/tmp/o1fm-atlas"
     assert json.loads(capsys.readouterr().out) == {"schema": "teacher"}

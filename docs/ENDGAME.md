@@ -192,7 +192,7 @@ fallback for novelty. [DistilTS](https://arxiv.org/abs/2601.12785)
 2. Toto-2.0-22M and Chronos-2 adapters behind one teacher protocol. **Running.**
 3. Factual and intervention-aware trajectory Crystals.
 4. `.causal` live Atlas records for routes, field revisions and compiled
-   response surfaces.
+   response surfaces. **Forecast/transport/settlement citations running.**
 5. O1 Cartographer jobs for autonomous horizon/target/action measurement.
 6. Battery policy for profitable idle-time branch charging.
 7. Markov/Seed policy learning over action, consequence, quality and work cost.
@@ -208,8 +208,19 @@ The Toto-2.0 family has now completed the full loop with actual Apache-2.0
 weights. Toto-4M runs as continuous local authority; Toto-22M refreshes authority
 after at most four local actions. Across 24 windows this removes 17 large-model
 calls (70.83%) and 51.92% of parameter-equivalent forward work. Marginal
-coverage rises from the all-22M control's 86.92% to 87.72%, joint coverage stays
-at 87.5%, and pinball changes by only 0.00185. Both checkpoints are pinned by
-their loaded tensor hashes. No ridge Crystal passed the strict gate, which fixes
-the next compiler task: replace summary-only Crystal inputs with contextual
-local-teacher states and causal path features.
+coverage rises from the all-22M control's 86.92% to 87.55%, joint coverage rises
+from 87.5% to 91.67%, and pinball changes by only 0.00141. Both checkpoints are
+pinned by their loaded tensor hashes. No ridge Crystal passed the strict gate,
+which fixes the next compiler task: replace summary-only Crystal inputs with
+contextual local-teacher states and causal path features.
+
+Shadow settlement now charges every fully computed candidate's exact Conformal
+Field without duplicating parent evidence. The local-base residual Crystal
+reaches 78.22% shadow coverage and 0.07372 pinball, but 4M remains superior at
+89.23% and 0.06486 for the same forward cost, so ActionBank correctly keeps the
+Crystal out of authority.
+
+The same run commits 72 `.causal` segments. Forecast origin, prediction,
+normalized transport and settlement form a directly addressable evidence chain;
+the manifest and segments verify after a fresh remount. This is the first live
+substrate for the future counterfactual branch compiler.
