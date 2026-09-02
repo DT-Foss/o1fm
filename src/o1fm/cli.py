@@ -9,6 +9,7 @@ from pathlib import Path
 
 from .cartography_demo import run_cartography_demo
 from .demo import run_demo
+from .intervention_compiler_demo import run_intervention_compiler_demo
 from .open_teacher_demo import run_open_teacher_demo
 
 
@@ -56,6 +57,18 @@ def build_parser() -> argparse.ArgumentParser:
     cartography.add_argument("--atlas-dir", required=True)
     cartography.add_argument("--selected-jobs", type=int, default=12)
     cartography.add_argument("--output", help="optional JSON result path")
+    compiler = subcommands.add_parser(
+        "compiler-demo",
+        help="compile settled intervention effects into local response Crystals",
+    )
+    compiler.add_argument("--checkpoint")
+    compiler.add_argument("--device", default="cpu")
+    compiler.add_argument("--seed", type=int, default=31)
+    compiler.add_argument("--state-dir")
+    compiler.add_argument("--atlas-dir", required=True)
+    compiler.add_argument("--training-windows", type=int, default=8)
+    compiler.add_argument("--evaluation-windows", type=int, default=4)
+    compiler.add_argument("--output", help="optional JSON result path")
     return parser
 
 
@@ -90,6 +103,16 @@ def main(argv: Sequence[str] | None = None) -> int:
             seed=args.seed,
             state_dir=args.state_dir,
             selected_jobs=args.selected_jobs,
+        )
+    elif args.command == "compiler-demo":
+        result = run_intervention_compiler_demo(
+            checkpoint=args.checkpoint,
+            atlas_dir=args.atlas_dir,
+            device=args.device,
+            seed=args.seed,
+            state_dir=args.state_dir,
+            training_windows=args.training_windows,
+            evaluation_windows=args.evaluation_windows,
         )
     else:  # pragma: no cover - argparse owns commands.
         raise AssertionError("unsupported command")

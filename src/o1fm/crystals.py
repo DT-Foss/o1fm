@@ -803,7 +803,18 @@ class ForecastCrystalBank:
         if selected_id is not None:
             self._observations[selected_id] = content_sha256
 
-        self._persist()
+        try:
+            self._persist()
+        except Exception:
+            # Mutation happens before the atomic replace.  A failed persist
+            # must never leave a same-process replay believing the observation
+            # is durable when a fresh process would not see it.
+            if self._path is not None and self._path.exists():
+                self._load()
+            else:
+                self._states = {}
+                self._observations = {}
+            raise
         return self._stats_for(state)
 
     def _predict_flat(self, state: _CrystalState, vector: FloatVector) -> FloatVector:

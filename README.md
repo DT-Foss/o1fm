@@ -183,6 +183,37 @@ The committed receipt is
 [`results/o1fm-chronos2-counterfactual-cartography-v1.json`](results/o1fm-chronos2-counterfactual-cartography-v1.json),
 SHA-256 `cfefc21c5a13f8f46e400443a6140a4f49c72714dd7d365f24de76a6a2dc83c0`.
 
+## Intervention response compiler result
+
+O1FM now compiles the Cartographer's settled branch evidence into an executable
+`InterventionResponseCrystal`. Chronos supplies one factual trajectory; the
+Crystal releases complete alternative horizons as local effects over that
+trajectory. Training uses eight earlier windows and eight intervention
+magnitudes per operator. Evaluation uses four later windows and four unseen
+magnitudes. Every origin predicts and decides all simultaneous branches before
+any branch is settled.
+
+| Metric | Direct Chronos branches | O1FM response compiler |
+|---|---:|---:|
+| Causal effect recovery, seasonal driver | 9.16% | **99.97%** |
+| Causal effect recovery, intervention level | 2.80% | **99.96%** |
+| Mean MAE | 0.25382 | **0.13812** |
+| Mean pinball | 0.10693 | **0.05473** |
+| Evaluation marginal coverage | 47.40% | **71.88%** |
+| Sequential O1 field coverage | — | **80.00%** |
+| Serving-policy forwards | 16 | **4** |
+
+MAE falls 45.58%, pinball falls 48.82%, and coverage gains 24.48 percentage
+points. ActionBank selects the Crystal for all 12 later branches. The unused
+trend intervention is a structural placebo: the compiler preserves essentially
+the factual error instead of inventing a response. The measurement run still
+executes 12 raw branch forwards for comparison; the 75% reduction is the exact
+serving policy selected before those benchmark-only calls.
+
+The committed receipt is
+[`results/o1fm-chronos2-intervention-compiler-v1.json`](results/o1fm-chronos2-intervention-compiler-v1.json),
+SHA-256 `1f949f09faa27fc501db68cb2e4cbdff9e6589d73cd0a115991158c70af1f939`.
+
 ## Relationship to TimesFM
 
 Google's TimesFM-3 established the strongest current reference geometry for
@@ -224,6 +255,13 @@ Run the intervention-aware Cartographer with the covariate-capable teacher:
 PYTHONPATH=/path/to/immer/src python -m o1fm cartography-demo \
   --teacher chronos2 \
   --atlas-dir artifacts/private/counterfactual-atlas.causal
+```
+
+Compile earlier interventions and release later unseen magnitudes locally:
+
+```bash
+PYTHONPATH=/path/to/immer/src python -m o1fm compiler-demo \
+  --atlas-dir artifacts/private/intervention-compiler-atlas.causal
 ```
 
 O1FM is developed by David Tom Foss.

@@ -1,0 +1,237 @@
+{
+  "atlas": {
+    "remount_verified": true,
+    "revision": [
+      3,
+      "5bb2a7a70cc3147c3903c133878bdf1ee54a1ce589074495771c567b002734f4"
+    ],
+    "verified": true
+  },
+  "authority_fragment_sha256": "cc3c8b5a4c125da647cbcaeccb22a94ba7bb1ca6af84f832aad0dea4bd16f579",
+  "compiler": {
+    "action_trace": [
+      "crystal",
+      "crystal",
+      "crystal",
+      "crystal",
+      "crystal",
+      "crystal",
+      "crystal",
+      "crystal",
+      "crystal",
+      "crystal",
+      "crystal",
+      "crystal"
+    ],
+    "key_sha256": "42b78f0d817f27743d90d19d79d16faa9577283254b78be827cd1adaa0db7060",
+    "stats": {
+      "coverage": 0.8053385416666666,
+      "direction_cosine": 0.9939567677678475,
+      "feature_dim": 66,
+      "mean_effect_error": 0.0035741969426624407,
+      "observed_values": 1536,
+      "ready": true,
+      "sequential_support": 32,
+      "support": 36
+    },
+    "training_crystal_receipts": 18
+  },
+  "conformal": {
+    "field": {
+      "exact_profile_count": 3,
+      "joint_coverage": 0.5333333333333333,
+      "mean_marginal_coverage": 0.8,
+      "mean_marginal_width_expansion": 0.06544960102352586,
+      "observed_values": 1440,
+      "pooled_profile_count": 3,
+      "settlements": 30
+    },
+    "o1": {
+      "bias": -0.009729258665093868,
+      "cusum": 0.0,
+      "ew_absolute_error": 0.13261782247119722,
+      "ew_normalized_error": 0.49223774898416445,
+      "head_event_sha256": "eb98be6593cde849729e487fb917f81b952894fff9778dcbc63831699505fb56",
+      "identity_sha256": "4b62e8849438992ce512154bc27aba1276207aed423a9b8dc9adeb6ad0c574ba",
+      "interval_coverage": 0.8,
+      "learning_progress": 0.001642513138087165,
+      "mae": 0.1319372800546666,
+      "mean_interval_width": 0.6063472007242025,
+      "observations": 30,
+      "pinball": {
+        "0x1.0000000000000p-1": 0.06776095846172313,
+        "0x1.999999999999ap-4": 0.0324632508360244,
+        "0x1.ccccccccccccdp-1": 0.04528285717644191
+      },
+      "regime_changes": 0,
+      "regime_generation": 0,
+      "schema": "o1fm.o1-error-metrics/v1",
+      "sequence": 30,
+      "surprise": 0.0,
+      "value_count": 1440
+    }
+  },
+  "data": {
+    "evaluation_values": {
+      "scheduled-intervention-level": [
+        0.2,
+        0.4,
+        0.6,
+        0.8
+      ],
+      "seasonal-driver-shift": [
+        -0.6,
+        -0.1,
+        0.35,
+        0.9
+      ],
+      "unused-trend-placebo": [
+        -0.7,
+        -0.1,
+        0.3,
+        0.7
+      ]
+    },
+    "evaluation_windows": 4,
+    "families": [
+      "seasonal-driver-shift",
+      "scheduled-intervention-level",
+      "unused-trend-placebo"
+    ],
+    "horizon": 16,
+    "target_count": 3,
+    "training_values": {
+      "scheduled-intervention-level": [
+        0.0,
+        1.0,
+        0.25,
+        0.75,
+        0.5,
+        0.125,
+        0.875,
+        0.375
+      ],
+      "seasonal-driver-shift": [
+        -1.0,
+        -0.75,
+        -0.5,
+        -0.25,
+        0.25,
+        0.5,
+        0.75,
+        1.0
+      ],
+      "unused-trend-placebo": [
+        -0.8,
+        -0.6,
+        -0.4,
+        -0.2,
+        0.2,
+        0.4,
+        0.6,
+        0.8
+      ]
+    },
+    "training_windows": 8,
+    "world_target_sha256": "6e7c9cd6598dfa431179f8f9dd3d0fe798b9a0e3221e843e18780258401bee14"
+  },
+  "economics": {
+    "actual_measured_eval_forwards": 16,
+    "baseline_eval_forwards": 16,
+    "benchmark_only_branch_forwards": 12,
+    "selected_eval_forwards": 4,
+    "serving_policy_forward_reduction": 0.75,
+    "training_forwards": 32
+  },
+  "environment": {
+    "device": "cpu",
+    "machine": "arm64",
+    "platform": "macOS-26.5-arm64-arm-64bit-Mach-O",
+    "python": "3.13.1",
+    "torch": "2.13.0"
+  },
+  "evaluation": {
+    "compiled_mean_coverage": 0.71875,
+    "compiled_mean_direction_cosine": 0.6666665389347582,
+    "compiled_mean_mae": 0.13811909795428315,
+    "compiled_mean_pinball": 0.05472551194811786,
+    "compiled_mean_recovery": 0.6664264551131539,
+    "families": {
+      "scheduled-intervention-level": {
+        "action_counts": {
+          "crystal": 4,
+          "foundation": 0
+        },
+        "compiled_coverage": 0.7395833333333334,
+        "compiled_direction_cosine": 0.9999997041147938,
+        "compiled_mae": 0.13816388704193133,
+        "compiled_pinball": 0.05463839621310669,
+        "compiled_recovery": 0.9995527702172526,
+        "raw_coverage": 0.39583333333333337,
+        "raw_direction_cosine": 0.018907630757200478,
+        "raw_mae": 0.25809733862600603,
+        "raw_pinball": 0.10968367746551305,
+        "raw_recovery": 0.02799058153990429,
+        "selected_mae": 0.13816388704193133
+      },
+      "seasonal-driver-shift": {
+        "action_counts": {
+          "crystal": 4,
+          "foundation": 0
+        },
+        "compiled_coverage": 0.7083333333333334,
+        "compiled_direction_cosine": 0.9999999126894809,
+        "compiled_mae": 0.138099860593987,
+        "compiled_pinball": 0.054770551876569366,
+        "compiled_recovery": 0.9997265951222088,
+        "raw_coverage": 0.328125,
+        "raw_direction_cosine": 0.8458931713047477,
+        "raw_mae": 0.3643771904559496,
+        "raw_pinball": 0.15642493230898807,
+        "raw_recovery": 0.0915676477868588,
+        "selected_mae": 0.138099860593987
+      },
+      "unused-trend-placebo": {
+        "action_counts": {
+          "crystal": 4,
+          "foundation": 0
+        },
+        "compiled_coverage": 0.7083333333333334,
+        "compiled_direction_cosine": 0.0,
+        "compiled_mae": 0.1380935462269311,
+        "compiled_pinball": 0.05476758775467748,
+        "compiled_recovery": 0.0,
+        "raw_coverage": 0.6979166666666666,
+        "raw_direction_cosine": 0.0,
+        "raw_mae": 0.13897445786278698,
+        "raw_pinball": 0.05469201793076477,
+        "raw_recovery": 0.0,
+        "selected_mae": 0.1380935462269311
+      }
+    },
+    "raw_mean_coverage": 0.4739583333333333,
+    "raw_mean_direction_cosine": 0.2882669340206494,
+    "raw_mean_mae": 0.25381632898158085,
+    "raw_mean_pinball": 0.10693354256842195,
+    "raw_mean_recovery": 0.03985274310892103
+  },
+  "schema": "o1fm.intervention-compiler-demo/v1",
+  "teacher": {
+    "capabilities": {
+      "known_future_covariates": true,
+      "multiple_targets": true,
+      "past_covariates": true,
+      "quantiles": true,
+      "schema": "o1fm.forecast-teacher-capabilities/v1"
+    },
+    "checkpoint": "amazon/chronos-2",
+    "identity_sha256": "2c682ee10ee739886e0e53956504ca10b7a130fd386b6af101ce0492a8a9ec67",
+    "load_seconds": 5.58898749994114,
+    "parameter_count": 119477664,
+    "weights_sha256": "4ead8c987101dd9d00c6486a947c43e1d1fc47d6957276921f222f29067fa8ab"
+  },
+  "timings": {
+    "evaluation_seconds": 0.8466652079951018,
+    "training_seconds": 1.3040524169337004
+  }
+}

@@ -205,6 +205,42 @@ foreign one. Partial settlements update every observed horizon cell immediately;
 unobserved cells use the Crystal's pre-update point as a neutral training value
 and never enter error or coverage totals.
 
+## Intervention Response Crystals
+
+An `InterventionResponseCrystal` compiles a local effect surface instead of a
+complete factual forecast. Its exact key binds model weights, state-feature ABI,
+intervention-vector ABI, target order/schema, route topology, regime, horizon
+and target count. The executable input contains only factual state, route
+transport and a known-future intervention schedule.
+
+For paired factual and intervention targets, the settled effect is
+
+```text
+delta_y = y_intervention - y_factual
+```
+
+Centered additive ridge statistics learn `delta_y` over the intervention
+vector. Prediction adds the compiled effect to one factual teacher trajectory.
+Ordered effect quantiles are composed with the factual quantiles, then the
+Directed O1 Conformal Field calibrates the resulting branch distribution from
+prior settlements. The comonotonic quantile sum is therefore only the base
+proposal; conformal coverage is the authority.
+
+Readiness requires sequential pre-update support, effect MAE, direction cosine
+and empirical effect coverage. Every observation uses a write-ahead record plus
+the inner Crystal's content identity. A failed atomic persist rolls in-memory
+state back to the last durable state before retry, preventing a process-local
+replay from outrunning remounted evidence.
+
+All branches at one forecast origin follow a hard barrier:
+
+```text
+predict every branch -> decide every action -> settle every branch
+```
+
+No alternative world's realized outcome can influence another simultaneous
+branch prediction.
+
 ## Economic Action Bank
 
 Each completed ticket records action, wall time, predictor forwards, score,

@@ -192,8 +192,8 @@ fallback for novelty. [DistilTS](https://arxiv.org/abs/2601.12785)
 
 1. Directed O1 Conformal Field with marginal and joint receipts.
 2. Toto-2.0-22M and Chronos-2 adapters behind one teacher protocol. **Running.**
-3. Factual and intervention-aware trajectory branches. **Executing through
-   capability-routed teachers; response-surface Crystal compilation next.**
+3. Factual and intervention-aware trajectory branches plus local response
+   surfaces. **Teacher branches and Intervention Response Crystals running.**
 4. `.causal` live Atlas records for routes, field revisions and compiled
    response surfaces. **Forecast/transport/settlement citations running.**
 5. O1 Cartographer jobs for autonomous horizon/target/action/intervention
@@ -251,3 +251,31 @@ These are now named response-surface debts, not invisible teacher error. O1 can
 prioritize those cells and compile their settled residual field into an
 intervention Crystal, leaving Chronos as the trajectory prior and novelty
 fallback.
+
+## First intervention compiler execution
+
+The measured response debt is now executable. Eight earlier same-regime windows
+settle eight distinct magnitudes for two causal operators and one structural
+placebo. Four later windows use four magnitudes absent from training. The
+Response Crystal receives only route `W1` and the known-future delta schedule;
+every simultaneous branch is predicted before any branch at that origin is
+settled.
+
+On the later magnitudes, raw Chronos recovers 9.16% of the seasonal-driver
+effect and 2.80% of the intervention-level effect. The local operator recovers
+99.97% and 99.96%, with direction cosine effectively one. Mean MAE falls from
+0.25382 to 0.13812 and mean pinball from 0.10693 to 0.05473. The placebo remains
+neutral. ActionBank selects the Response Crystal for all 12 branches.
+
+One factual Chronos forward now releases three alternative trajectories. The
+selected serving policy uses four forwards where direct branch execution needs
+16, a 75% reduction. The measurement command still executes the 12 raw branch
+forwards as benchmark-only calls and records both actual measurement compute and
+selected serving compute separately.
+
+The response effect field reaches 80.53% empirical coverage. The Directed O1
+Conformal Field settles 30 compiled branches at exactly 80% marginal coverage;
+the four-window unseen-magnitude suffix rises from 47.40% raw coverage to
+71.88%. The remaining suffix calibration debt, new operator shapes, topology
+shifts and regime transfer are now the next Cartographer targets rather than
+missing architecture.

@@ -158,6 +158,15 @@ def test_action_bank_validates_receipts() -> None:
             latency_seconds=0.1,
             forward_cost=0.0,
         )
+    with pytest.raises(ValueError):
+        ActionReceipt(
+            profile,
+            "foundation",
+            quality=0.1,
+            coverage=1.5,
+            latency_seconds=0.1,
+            forward_cost=0.0,
+        )
 
 
 def test_action_bank_prices_verified_local_teacher(tmp_path: Path) -> None:
@@ -201,12 +210,25 @@ def test_action_bank_settlement_ids_are_replay_safe_and_persistent(
             ActionReceipt(profile, "foundation", 0.2, 0.8, 0.2, 1.0),
             settlement_id="ticket:1:foundation",
         )
-    with pytest.raises(ValueError):
-        ActionReceipt(
-            profile,
-            "foundation",
-            quality=0.1,
-            coverage=1.5,
-            latency_seconds=0.1,
-            forward_cost=0.0,
-        )
+
+
+def test_action_bank_persist_failure_rolls_back_in_memory_replay(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    path = tmp_path / "actions.json"
+    bank = ActionBank(path, min_support=1)
+    receipt = ActionReceipt(_profile(), "foundation", 0.1, 0.8, 0.2, 1.0)
+    original = bank._persist
+
+    def fail() -> None:
+        raise RuntimeError("injected persist failure")
+
+    monkeypatch.setattr(bank, "_persist", fail)
+    with pytest.raises(RuntimeError, match="injected"):
+        bank.settle(receipt, settlement_id="receipt:1")
+    monkeypatch.setattr(bank, "_persist", original)
+    assert bank.settle(receipt, settlement_id="receipt:1").support == 1
+    assert (
+        ActionBank(path, min_support=1).describe(_profile())["foundation"].support == 1
+    )

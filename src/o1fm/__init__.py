@@ -90,6 +90,16 @@ from .crystals import (
 )
 from .features import FEATURE_ABI, extract_features, feature_schema
 from .identity import CanonicalIdentity, canonical_json_bytes, sha256_json
+from .intervention_compiler_demo import run_intervention_compiler_demo
+from .intervention_crystals import (
+    InterventionResponseConflictError,
+    InterventionResponseCrystal,
+    InterventionResponseError,
+    InterventionResponseIntegrityError,
+    InterventionResponseKey,
+    InterventionResponsePrediction,
+    InterventionResponseStats,
+)
 from .losses import forecast_loss, monotone_penalty, pinball_loss
 from .metrics import ForecastScore, score_prediction, verify_prediction
 from .model import ForecastBatch, ForecastResult, O1FMConfig, O1FMForecaster
@@ -189,6 +199,13 @@ __all__ = [
     "IdentificationStatus",
     "InterventionOperation",
     "InterventionPlan",
+    "InterventionResponseConflictError",
+    "InterventionResponseCrystal",
+    "InterventionResponseError",
+    "InterventionResponseIntegrityError",
+    "InterventionResponseKey",
+    "InterventionResponsePrediction",
+    "InterventionResponseStats",
     "InterventionSpec",
     "JointEnvelope",
     "O1Config",
@@ -247,6 +264,7 @@ __all__ = [
     "route_transport_w1",
     "run_open_teacher_demo",
     "run_cartography_demo",
+    "run_intervention_compiler_demo",
     "score_prediction",
     "sha256_json",
     "sinkhorn_transport",

@@ -66,3 +66,17 @@
   Cartographer settles 12 D-optimal cells with three physical forwards (75%
   reduction) and exposes the exact intervention response surfaces the next
   Crystal compiler must learn.
+- Added persistent Intervention Response Crystals keyed by model, state ABI,
+  intervention-vector ABI, target schema/order, route, regime and horizon.
+  They compile paired effects over one factual teacher trajectory with additive
+  ridge statistics, directed effect quantiles, readiness from sequential MAE,
+  direction and coverage, and write-ahead exactly-once settlement.
+- Added persist-failure rollback to both ForecastCrystalBank and ActionBank so
+  same-process replay cannot outrun remounted durable state.
+- Enforced a simultaneous-branch barrier: all branches at one origin predict
+  and choose actions before any alternative outcome updates O1, Conformal,
+  ActionBank or a response surface.
+- Ran the response compiler on later windows and unseen intervention
+  magnitudes. It recovers 99.97% / 99.96% of two causal effects, cuts MAE 45.58%
+  and pinball 48.82%, improves suffix coverage by 24.48 points, and lets
+  ActionBank release 12 branches with four factual forwards instead of 16.

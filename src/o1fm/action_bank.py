@@ -454,7 +454,15 @@ class ActionBank:
             del state.receipts[: len(state.receipts) - self._max_receipts_per_action]
         if selected_id is not None:
             self._settlements[selected_id] = content_sha256
-        self._persist()
+        try:
+            self._persist()
+        except Exception:
+            if self._path is not None and self._path.exists():
+                self._load()
+            else:
+                self._profiles = {}
+                self._settlements = {}
+            raise
         return self._stats_for(receipt.action, state)
 
     def describe(self, profile: ActionProfileKey) -> Mapping[str, ActionStats]:
