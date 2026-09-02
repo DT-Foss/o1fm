@@ -308,8 +308,10 @@ origins requires one factual forward each instead of factual plus three branch
 forwards: 16 → 4. Across all response settlements, the directed O1 field holds
 80.24% marginal coverage.
 
-The response O1 stream does not cross its CUSUM regime threshold in this run.
-The proven transfer axis is therefore structural regime plus graph topology,
-not an O1-generation transition. The next experiment must induce and bind a
-real O1 generation, then test whether the same parent/fallback/adaptation cycle
-holds without resetting the stream.
+Authority O1 stays in generation 0 across six stable regime-0 origins. CUSUM
+reaches `0.44243` without firing at origin 496; the first regime-1 forecast at
+origin 512 contributes surprise `0.85018`, crosses the measured threshold and
+advances generation `0 -> 1`. The new exact response key binds both O1
+generation 1 and the new graph topology. The parent/fallback/audit/release cycle
+therefore now holds across state, unseen operator shape, structural regime,
+authenticated topology and an actual continuous O1 generation transition.

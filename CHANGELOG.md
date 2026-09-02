@@ -91,3 +91,7 @@
   topology first routes 9/9 branches to Chronos, then routes 12/12 locally after
   three audit origins; adapted MAE falls 13.64%, pinball 17.48%, coverage gains
   31.60 points, and serving forwards fall 75%.
+- Bound transfer to a real authority-O1 transition: six stable regime-0
+  forecasts remain generation 0 and the first regime-1 forecast advances CUSUM
+  generation 0 → 1; the new response key carries that generation together with
+  its graph topology.

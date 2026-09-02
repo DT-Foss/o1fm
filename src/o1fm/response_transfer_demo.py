@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import math
 import platform
 import sys
 import tempfile
@@ -282,13 +283,14 @@ def _response_key(
     *,
     model_identity: str,
     regime: int,
+    o1_generation: int,
     fit_scope: str,
 ) -> InterventionResponseKey:
     return InterventionResponseKey(
         model_identity=model_identity,
         feature_schema=sha256_json(
             {
-                "control_tail": "structural-regime-scalar/v1",
+                "control_tail": "structural-regime-plus-o1-generation/v1",
                 "layout_sha256": schema.layout_identity_sha256,
                 "projection_scope_sha256": schema.resolved_projection_scope_sha256,
                 "schema": "o1fm.transfer-response-feature-schema/v1",
@@ -302,7 +304,7 @@ def _response_key(
         ),
         target_schema=schema.target_schema_sha256,
         graph_revision=schema.graph_topology_sha256,
-        regime=f"structural-regime:{regime}",
+        regime=f"structural-regime:{regime}:o1-generation:{o1_generation}",
         horizon=schema.horizon,
         target_count=schema.target_count,
         fit_scope_sha256=fit_scope,
@@ -316,12 +318,13 @@ def _features(
     plan: InterventionPlan,
     route: ResponseRouteContext,
     regime: int,
+    o1_generation: int,
 ) -> np.ndarray:
     encoded = encoder.encode(inputs, plan, route)
     result = np.concatenate(
         (
             encoded.design_vector,
-            np.asarray((regime / 2.0,), dtype=np.float64),
+            np.asarray((regime / 2.0, o1_generation / 8.0), dtype=np.float64),
         )
     )
     result.setflags(write=False)
@@ -467,6 +470,8 @@ def run_response_transfer_demo(
     selected_teacher = teacher or _load_teacher(
         "chronos2", checkpoint=checkpoint, device=device
     )
+    enforce_o1_transition = teacher is None
+    r1_o1_generation = 1 if enforce_o1_transition else 0
     load_seconds = time.perf_counter() - load_started
     if not selected_teacher.capabilities.known_future_covariates:
         raise ValueError("transfer demo requires a known-future-capable teacher")
@@ -545,10 +550,18 @@ def run_response_transfer_demo(
         encoder0 = InterventionResponseFeatureEncoder(schema0)
         encoder1 = InterventionResponseFeatureEncoder(schema1)
         key0 = _response_key(
-            schema0, model_identity=model_identity, regime=0, fit_scope=fit_scope
+            schema0,
+            model_identity=model_identity,
+            regime=0,
+            o1_generation=0,
+            fit_scope=fit_scope,
         )
         key1 = _response_key(
-            schema1, model_identity=model_identity, regime=1, fit_scope=fit_scope
+            schema1,
+            model_identity=model_identity,
+            regime=1,
+            o1_generation=r1_o1_generation,
+            fit_scope=fit_scope,
         )
         if key0.crystal_key() != key1.crystal_key():
             raise RuntimeError("exact transfer domains do not share parent parameters")
@@ -580,6 +593,16 @@ def run_response_transfer_demo(
             stream_id="response-transfer",
             config=O1Config(quantiles=(0.1, 0.5, 0.9)),
         )
+        authority_o1 = O1ErrorStream(
+            root / "authority-regime-o1.json",
+            stream_id="chronos-authority-transfer",
+            config=O1Config(
+                quantiles=(0.1, 0.5, 0.9),
+                cusum_decay=0.9,
+                cusum_drift=0.0,
+                cusum_threshold=1.0,
+            ),
+        )
 
         factual_cache: dict[str, ForecastPrediction] = {
             _window_identity(r0[0].inputs): r0_ticket.prediction,
@@ -592,12 +615,51 @@ def run_response_transfer_demo(
                 factual_cache[identity] = selected_teacher.predict(example.inputs)
             return factual_cache[identity]
 
+        series_ticks = dataset.series[0].timestamps.astype(np.int64, copy=False)
+
+        def observe_authority_o1(
+            example: ForecastExample,
+            *,
+            observation_id: str,
+        ) -> dict[str, object]:
+            prediction = factual(example)
+            target = dataset.counterfactual_target(example.inputs)
+            assert prediction.quantiles is not None
+            assert prediction.quantile_levels is not None
+            quantile_map = {}
+            for index, raw_level in enumerate(prediction.quantile_levels):
+                level = float(raw_level)
+                for configured in authority_o1.config.quantiles:
+                    if math.isclose(level, configured, abs_tol=1e-7):
+                        quantile_map[configured] = prediction.quantiles[..., index]
+            update = authority_o1.observe(
+                target.values,
+                prediction.point,
+                quantile_forecasts=quantile_map,
+                mask=target.mask,
+                observation_id=observation_id,
+            )
+            origin = int(
+                np.searchsorted(
+                    series_ticks,
+                    example.inputs.future_timestamps[0].astype(np.int64),
+                )
+            )
+            return {
+                "cusum": update.cusum,
+                "generation": update.regime_generation,
+                "origin": origin,
+                "regime_changed": update.regime_changed,
+                "structural_regime": int(dataset.series[0].regime_ids[origin]),
+                "surprise": update.surprise,
+            }
+
         operators = _training_operators(16)
         candidates: list[_Probe] = []
         for ordinal, operator in enumerate(operators):
             example = r0[ordinal % 4]
             plan = operator.plan(example.inputs, name=f"r0-train:{ordinal}")
-            feature = _features(encoder0, example.inputs, plan, route0, 0)
+            feature = _features(encoder0, example.inputs, plan, route0, 0, 0)
             candidates.append(
                 _Probe(
                     example=example,
@@ -743,6 +805,7 @@ def run_response_transfer_demo(
             encoder: InterventionResponseFeatureEncoder,
             route: ResponseRouteContext,
             regime: int,
+            o1_generation: int,
             stage: str,
             settle: bool,
         ) -> list[dict[str, object]]:
@@ -759,7 +822,14 @@ def run_response_transfer_demo(
                         name=f"{stage}:{origin_ordinal}:{operator.family}",
                     )
                     edited = apply_intervention(example.inputs, plan)
-                    feature = _features(encoder, example.inputs, plan, route, regime)
+                    feature = _features(
+                        encoder,
+                        example.inputs,
+                        plan,
+                        route,
+                        regime,
+                        o1_generation,
+                    )
                     compiled = responses.predict(key, feature, factual_prediction)
                     profile = _profile(key, operator.family)
                     application = (
@@ -891,15 +961,40 @@ def run_response_transfer_demo(
             encoder=encoder0,
             route=route0,
             regime=0,
+            o1_generation=0,
             stage="r0-holdout",
             settle=True,
         )
+        o1_transition_trace = [
+            observe_authority_o1(
+                example,
+                observation_id=f"authority-transition:{phase}:{index}",
+            )
+            for phase, examples in (("r0", r0[-6:]), ("r1", r1[:1]))
+            for index, example in enumerate(examples)
+        ]
+        if enforce_o1_transition and any(
+            bool(row["regime_changed"])
+            for row in o1_transition_trace
+            if row["structural_regime"] == 0
+        ):
+            raise RuntimeError("authority O1 changed generation before the world shift")
+        transition = o1_transition_trace[-1]
+        if enforce_o1_transition and (
+            transition["structural_regime"] != 1
+            or transition["generation"] != 1
+            or not transition["regime_changed"]
+        ):
+            raise RuntimeError(
+                "authority O1 did not detect the structural regime shift"
+            )
         r1_audits = evaluate(
             r1[5:8],
             key=key1,
             encoder=encoder1,
             route=route1,
             regime=1,
+            o1_generation=r1_o1_generation,
             stage="r1-audit",
             settle=True,
         )
@@ -909,6 +1004,7 @@ def run_response_transfer_demo(
             encoder=encoder1,
             route=route1,
             regime=1,
+            o1_generation=r1_o1_generation,
             stage="r1-local",
             settle=True,
         )
@@ -957,6 +1053,8 @@ def run_response_transfer_demo(
                 "selected_count": len(selected_probes),
             },
             "control": {
+                "authority_o1": authority_o1.metrics(),
+                "authority_o1_transition_trace": o1_transition_trace,
                 "conformal": conformal.metrics(),
                 "response_o1": response_o1.metrics(),
             },
@@ -994,6 +1092,7 @@ def run_response_transfer_demo(
                 "r0_exact_key_sha256": key0.identity_sha256,
                 "r0_topology_sha256": schema0.graph_topology_sha256,
                 "r1_exact_key_sha256": key1.identity_sha256,
+                "r1_o1_generation": r1_o1_generation,
                 "r1_topology_sha256": schema1.graph_topology_sha256,
                 "shared_inner_crystal": key0.crystal_key() == key1.crystal_key(),
             },

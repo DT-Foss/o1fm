@@ -238,13 +238,15 @@ The transferred parent is already better during the cold phase, but O1FM does
 not serve it without exact-domain evidence. After three origins, ActionBank
 releases all later branches locally: MAE falls 13.64%, pinball 17.48%, coverage
 gains 31.60 points, and serving work falls 75%. Across all 68 compiled
-settlements, the Directed O1 field holds 80.24% marginal coverage. The response
-O1 stream did not declare a separate CUSUM generation in this run; the proven
-shift is structural-regime plus authenticated graph-topology transfer.
+settlements, the Directed O1 field holds 80.24% marginal coverage. Authority O1
+remains at generation 0 through the six stable origins `416..496`, then the
+first structural-regime-1 forecast at origin `512` contributes surprise
+`0.85018` and advances generation `0 -> 1`. The new exact response key binds
+that measured O1 generation together with the new graph topology.
 
 The committed receipt is
 [`results/o1fm-chronos2-response-transfer-v1.json`](results/o1fm-chronos2-response-transfer-v1.json),
-SHA-256 `d36417d40b24c7218f5abbc7955a9750f6db1af959b0b7304740b6150a5eae04`.
+SHA-256 `0e16c6f959afff305c7b95ef5bccebd1a3743e79dcbb19a417160a6d1c6bb9a7`.
 
 ## Relationship to TimesFM
 
