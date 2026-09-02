@@ -79,10 +79,15 @@ def _receipt(seed: str = "a") -> AtlasReceipt:
     )
 
 
-def _edge(*, source: str = "known:0", kind: str = "intervention") -> CausalEdge:
+def _edge(
+    *,
+    source: str = "known:0",
+    target: str = "target:0",
+    kind: str = "intervention",
+) -> CausalEdge:
     return CausalEdge(
         source=source,
-        target="target:0",
+        target=target,
         lag=0,
         kind=kind,  # type: ignore[arg-type]
         observations=12,
@@ -95,7 +100,11 @@ def _edge(*, source: str = "known:0", kind: str = "intervention") -> CausalEdge:
 
 
 def _prediction(inputs: ForecastInputs) -> ForecastPrediction:
-    point = inputs.known_covariates[inputs.history_length :, :1]
+    point = np.repeat(
+        inputs.known_covariates[inputs.history_length :, :1],
+        inputs.target_dim,
+        axis=1,
+    )
     offsets = np.asarray((-1.0, 0.0, 1.0), dtype=np.float32)
     return ForecastPrediction(
         series_id=inputs.series_id,
@@ -294,6 +303,69 @@ def test_executor_separates_graph_support_observed_policy_and_hypothesis() -> No
             factual_identity=hypothetical.factual.branch_identity,
             intervention_identity=supported_plan.identity,
         )
+
+
+def test_graph_support_requires_every_edited_source_target_pair() -> None:
+    base = _inputs()
+    inputs = ForecastInputs(
+        series_id=base.series_id,
+        horizon=base.horizon,
+        timestamps=base.timestamps,
+        past_target=np.concatenate((base.past_target, base.past_target + 10.0), axis=1),
+        past_covariates=base.past_covariates,
+        known_covariates=base.known_covariates,
+        known_covariate_mask=base.known_covariate_mask,
+    )
+    plan = InterventionPlan(
+        "two-source-edit",
+        (
+            _spec(inputs, name="price", covariate=0),
+            _spec(
+                inputs,
+                name="promotion",
+                covariate=1,
+                values=(4.0, 4.0, 4.0),
+            ),
+        ),
+    )
+    three_of_four = (
+        _edge(source="known:0", target="target:0"),
+        _edge(source="known:0", target="target:1"),
+        _edge(source="known:1", target="target:0"),
+    )
+    incomplete = BranchExecutor(
+        lambda value: _execution(value, edges=three_of_four)
+    ).execute(inputs, (plan,))
+    hypothesis = next(
+        branch for branch in incomplete.branches.values() if not branch.is_factual
+    )
+    assert hypothesis.identification is IdentificationStatus.COUNTERFACTUAL_HYPOTHESIS
+    assert hypothesis.supporting_edges == ()
+    assert "known:1->target:1" in hypothesis.assumptions[-1]
+
+    complete_edges = (
+        *three_of_four,
+        _edge(source="known:1", target="target:1"),
+    )
+    complete = BranchExecutor(
+        lambda value: _execution(value, edges=complete_edges)
+    ).execute(inputs, (plan,))
+    supported = next(
+        branch for branch in complete.branches.values() if not branch.is_factual
+    )
+    assert supported.identification is IdentificationStatus.GRAPH_SUPPORTED_INTERVENTION
+    assert supported.supporting_edges == tuple(
+        sorted(
+            complete_edges,
+            key=lambda edge: (
+                edge.source,
+                edge.target,
+                edge.lag,
+                edge.kind,
+                edge.revision_sha256,
+            ),
+        )
+    )
 
 
 def test_branch_set_alignment_crossing_deltas_envelopes_and_extremes() -> None:

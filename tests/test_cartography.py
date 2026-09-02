@@ -25,6 +25,7 @@ def _target(
     seed: int,
     *,
     series: str = "load:north",
+    topology: str = "3" * 64,
     horizon: int = 12,
     target_indices: tuple[int, ...] = (0,),
     actions: tuple[str, ...] = ("foundation", "crystal"),
@@ -36,7 +37,7 @@ def _target(
         series_id=series,
         dataset_identity_sha256="1" * 64,
         model_identity_sha256="2" * 64,
-        graph_topology_sha256="3" * 64,
+        graph_topology_sha256=topology,
         regime="stable",
         horizon=horizon,
         target_indices=target_indices,
@@ -121,7 +122,9 @@ def test_idempotent_extension_and_productive_priority_ordering(tmp_path: Path) -
     assert cartographer.next_job() == high_next
 
 
-def test_priority_accounts_for_unexplored_cells_and_expected_cost(tmp_path: Path) -> None:
+def test_priority_accounts_for_unexplored_cells_and_expected_cost(
+    tmp_path: Path,
+) -> None:
     cartographer = ForecastCartographer(tmp_path / "map")
     history = _target(0)
     repeated = _target(1)
@@ -134,6 +137,40 @@ def test_priority_accounts_for_unexplored_cells_and_expected_cost(tmp_path: Path
     assert cartographer.priority_breakdown(novel).unexplored_fraction == 0.75
     assert cartographer.priority(novel) > cartographer.priority(repeated)
     assert cartographer.value_density(expensive) < cartographer.value_density(novel)
+
+
+def test_priority_evidence_isolated_across_graph_topologies(tmp_path: Path) -> None:
+    config = CartographerConfig(unexplored_weight=1.0)
+    cartographer = ForecastCartographer(tmp_path / "map", config=config)
+    old_topology = _target(0, topology="3" * 64)
+    same_topology = _target(1, topology="3" * 64)
+    new_topology = _target(2, topology="4" * 64)
+    cartographer.extend_targets((old_topology, same_topology, new_topology))
+    cartographer.settle(
+        _evidence(
+            old_topology,
+            coverage_gap=0.9,
+            joint_miss=1.0,
+            surprise=4.0,
+            learning=0.0,
+            route_w1=3.0,
+        ),
+        committed_at=200.0,
+    )
+
+    related = cartographer.priority_breakdown(same_topology)
+    isolated = cartographer.priority_breakdown(new_topology)
+    fresh = ForecastCartographer(tmp_path / "fresh", config=config)
+    fresh.add_target(new_topology)
+    baseline = fresh.priority_breakdown(new_topology)
+
+    assert related.related_receipts == 1
+    assert related.low_learning_decay == pytest.approx(0.5)
+    assert isolated.related_receipts == 0
+    assert isolated.unexplored_fraction == 1.0
+    assert isolated.low_learning_decay == 1.0
+    assert isolated.priority == pytest.approx(baseline.priority)
+    assert isolated.value_density == pytest.approx(baseline.value_density)
 
 
 def test_d_optimal_batch_prefers_information_diversity(tmp_path: Path) -> None:
@@ -170,9 +207,7 @@ def test_global_and_batch_budgets_are_enforced_exactly(tmp_path: Path) -> None:
 
     assert cartographer.next_job() is None
     assert cartographer.metrics()["remaining_work"] == pytest.approx(0.5)
-    assert cartographer.d_optimal_batch(
-        {second: [1.0]}, batch_size=1
-    ) == ()
+    assert cartographer.d_optimal_batch({second: [1.0]}, batch_size=1) == ()
     with pytest.raises(CartographyBudgetError):
         cartographer.settle(_evidence(second, work=1.5), committed_at=201.0)
 

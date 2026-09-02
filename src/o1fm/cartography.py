@@ -264,10 +264,7 @@ class ForecastProbeTarget:
             raise ValueError("target_indices must be an integer sequence")
         targets = tuple(
             sorted(
-                {
-                    _uint(value, field="target index")
-                    for value in self.target_indices
-                }
+                {_uint(value, field="target index") for value in self.target_indices}
             )
         )
         if not targets or len(targets) > MAX_TARGET_INDICES:
@@ -348,9 +345,7 @@ class ForecastProbeTarget:
                 horizon=record["horizon"],
                 target_indices=tuple(record["target_indices"]),
                 action_inventory=tuple(record["action_inventory"]),
-                intervention_identity_sha256=record[
-                    "intervention_identity_sha256"
-                ],
+                intervention_identity_sha256=record["intervention_identity_sha256"],
                 seed=record["seed"],
                 expected_work=_parse_hex(
                     record["expected_work"],
@@ -500,9 +495,7 @@ class ProbeEvidence:
                     record["learning_progress"],
                     field="learning_progress",
                 ),
-                route_w1=_parse_hex(
-                    record["route_w1"], field="route_w1", minimum=0.0
-                ),
+                route_w1=_parse_hex(record["route_w1"], field="route_w1", minimum=0.0),
                 observed_values=record["observed_values"],
                 work_cost=_parse_hex(
                     record["work_cost"], field="work_cost", minimum=0.0
@@ -956,9 +949,7 @@ class ForecastCartographer:
                 requested_budgets = budgets
                 if work_budget is not None or byte_budget is not None:
                     requested_budgets = CartographerBudgets(
-                        work=self.budgets.work
-                        if work_budget is None
-                        else work_budget,
+                        work=self.budgets.work if work_budget is None else work_budget,
                         bytes=self.budgets.bytes
                         if byte_budget is None
                         else byte_budget,
@@ -1081,12 +1072,16 @@ class ForecastCartographer:
         except (TypeError, ValueError) as exc:
             if isinstance(exc, CartographyIntegrityError):
                 raise
-            raise CartographyIntegrityError("cartographer checkpoint is invalid") from exc
+            raise CartographyIntegrityError(
+                "cartographer checkpoint is invalid"
+            ) from exc
         self._targets = {target.sha256: target for target in targets}
         if len(self._targets) != len(targets) or [
             target.sha256 for target in targets
         ] != sorted(self._targets):
-            raise CartographyIntegrityError("target inventory is duplicated or unordered")
+            raise CartographyIntegrityError(
+                "target inventory is duplicated or unordered"
+            )
 
         self._receipts = []
         self._settled = {}
@@ -1101,12 +1096,14 @@ class ForecastCartographer:
         if checkpoint_sequence > len(self._receipts):
             raise CartographyIntegrityError("checkpoint is ahead of evidence history")
         if checkpoint_sequence == len(self._receipts):
-            if (
-                body["completed_target_sha256s"] != expected_completed
-                or checkpoint_head
-                != (self._receipts[-1].sha256 if self._receipts else ZERO_SHA256)
+            if body[
+                "completed_target_sha256s"
+            ] != expected_completed or checkpoint_head != (
+                self._receipts[-1].sha256 if self._receipts else ZERO_SHA256
             ):
-                raise CartographyIntegrityError("checkpoint and evidence history differ")
+                raise CartographyIntegrityError(
+                    "checkpoint and evidence history differ"
+                )
         else:
             # An immutable event won the crash race before the replace of state.
             self._write_checkpoint()
@@ -1137,7 +1134,9 @@ class ForecastCartographer:
                 name="cartography event",
             )
             if document["schema"] != EVENT_SCHEMA:
-                raise CartographyIntegrityError("cartography event schema is unsupported")
+                raise CartographyIntegrityError(
+                    "cartography event schema is unsupported"
+                )
             receipt = ProbeReceipt.from_record(document["receipt"])
             if (
                 receipt.sequence != expected_sequence
@@ -1157,8 +1156,13 @@ class ForecastCartographer:
             self._settled[receipt.target_sha256] = receipt
             expected_sequence += 1
             previous = receipt.sha256
-        if self._total_work() > self.budgets.work or self._total_bytes() > self.budgets.bytes:
-            raise CartographyIntegrityError("evidence history exceeds persisted budgets")
+        if (
+            self._total_work() > self.budgets.work
+            or self._total_bytes() > self.budgets.bytes
+        ):
+            raise CartographyIntegrityError(
+                "evidence history exceeds persisted budgets"
+            )
 
     def extend_targets(self, targets: Iterable[ForecastProbeTarget]) -> int:
         """Idempotently add immutable targets and return the number added."""
@@ -1192,6 +1196,7 @@ class ForecastCartographer:
             target.series_id,
             target.dataset_identity_sha256,
             target.model_identity_sha256,
+            target.graph_topology_sha256,
             target.regime,
         )
 
@@ -1318,7 +1323,9 @@ class ForecastCartographer:
             and target.expected_work <= remaining_work
             and target.expected_bytes <= remaining_bytes
         ]
-        estimates = {target.sha256: self.priority_breakdown(target) for target in candidates}
+        estimates = {
+            target.sha256: self.priority_breakdown(target) for target in candidates
+        }
         candidates.sort(
             key=lambda target: (
                 -estimates[target.sha256].priority,
@@ -1363,8 +1370,7 @@ class ForecastCartographer:
             + self.config.joint_miss_weight * evidence.joint_miss
             + self.config.surprise_weight * evidence.o1_surprise
             + self.config.route_w1_weight * evidence.route_w1
-            + self.config.learning_progress_weight
-            * abs(evidence.learning_progress)
+            + self.config.learning_progress_weight * abs(evidence.learning_progress)
         )
 
     def settle(
@@ -1393,9 +1399,13 @@ class ForecastCartographer:
                     "realized work exceeds the target's declared expected work"
                 )
             if self._total_work() + evidence.work_cost > self.budgets.work:
-                raise CartographyBudgetError("cartographer work budget would be exceeded")
+                raise CartographyBudgetError(
+                    "cartographer work budget would be exceeded"
+                )
             if self._total_bytes() + target.expected_bytes > self.budgets.bytes:
-                raise CartographyBudgetError("cartographer byte budget would be exceeded")
+                raise CartographyBudgetError(
+                    "cartographer byte budget would be exceeded"
+                )
             estimate = self.priority_breakdown(target)
             receipt = ProbeReceipt(
                 sequence=len(self._receipts) + 1,
@@ -1450,7 +1460,9 @@ class ForecastCartographer:
             if not isinstance(evidence, ProbeEvidence):
                 raise TypeError("executor must return ProbeEvidence")
             if evidence.target_sha256 != target.sha256:
-                raise ProbeConflictError("executor returned evidence for another target")
+                raise ProbeConflictError(
+                    "executor returned evidence for another target"
+                )
             return self.settle(evidence)
         finally:
             with self._lock:
@@ -1481,9 +1493,7 @@ class ForecastCartographer:
         consumed_work = 0.0
         consumed_bytes = 0
         for _ in range(jobs):
-            available_work = (
-                None if local_work is None else local_work - consumed_work
-            )
+            available_work = None if local_work is None else local_work - consumed_work
             available_bytes = (
                 None if local_bytes is None else local_bytes - consumed_bytes
             )
@@ -1535,7 +1545,9 @@ class ForecastCartographer:
                     raise ValueError("feature_vectors contains a duplicate target")
                 array = np.asarray(raw, dtype=np.float64)
                 if array.ndim != 1 or array.size == 0:
-                    raise ValueError("feature vectors must be non-empty and one-dimensional")
+                    raise ValueError(
+                        "feature vectors must be non-empty and one-dimensional"
+                    )
                 if array.size > self.config.max_feature_dimension:
                     raise ValueError("feature vector dimension exceeds its bound")
                 if not np.all(np.isfinite(array)):
@@ -1546,7 +1558,10 @@ class ForecastCartographer:
                     dimension = int(array.size)
                 elif array.size != dimension:
                     raise ValueError("feature vectors must share one dimension")
-                if target.sha256 not in self._settled and target.sha256 not in self._inflight:
+                if (
+                    target.sha256 not in self._settled
+                    and target.sha256 not in self._inflight
+                ):
                     vectors[target.sha256] = np.ascontiguousarray(array)
             if not vectors:
                 return ()
@@ -1569,13 +1584,10 @@ class ForecastCartographer:
             selected_bytes = 0
             remaining = dict(vectors)
             estimates = {
-                identity: self.priority_breakdown(identity)
-                for identity in remaining
+                identity: self.priority_breakdown(identity) for identity in remaining
             }
             while remaining and len(selected) < size:
-                choices: list[
-                    tuple[float, float, float, str, ForecastProbeTarget]
-                ] = []
+                choices: list[tuple[float, float, float, str, ForecastProbeTarget]] = []
                 for identity in sorted(remaining):
                     target = self._targets[identity]
                     if (
@@ -1587,7 +1599,9 @@ class ForecastCartographer:
                     try:
                         solved = np.linalg.solve(information, vector)
                     except np.linalg.LinAlgError as exc:  # Positive ridge is invariant.
-                        raise CartographyError("D-optimal information matrix failed") from exc
+                        raise CartographyError(
+                            "D-optimal information matrix failed"
+                        ) from exc
                     quadratic = max(0.0, float(vector @ solved))
                     gain = math.log1p(quadratic)
                     estimate = estimates[identity]

@@ -1056,21 +1056,30 @@ class BranchExecutor:
                 and edge.source in sources
                 and edge.target in target_names
             )
-            covered_sources = {edge.source for edge in matching}
+            required_pairs = {
+                (source, target) for source in sources for target in target_names
+            }
+            covered_pairs = {(edge.source, edge.target) for edge in matching}
             if plan.observed_policy:
                 identification = IdentificationStatus.OBSERVED_POLICY_INTERVENTION
                 supporting: tuple[CausalEdge, ...] = ()
                 extra_assumptions: tuple[str, ...] = ()
-            elif sources and covered_sources == sources:
+            elif required_pairs and covered_pairs == required_pairs:
                 identification = IdentificationStatus.GRAPH_SUPPORTED_INTERVENTION
                 supporting = matching
                 extra_assumptions = ()
             else:
                 identification = IdentificationStatus.COUNTERFACTUAL_HYPOTHESIS
                 supporting = ()
-                missing = ",".join(sorted(sources - covered_sources)) or "none"
+                missing = (
+                    ",".join(
+                        f"{source}->{target}"
+                        for source, target in sorted(required_pairs - covered_pairs)
+                    )
+                    or "none"
+                )
                 extra_assumptions = (
-                    f"No complete intervention-edge support for sources: {missing}",
+                    f"No complete intervention-edge support for pairs: {missing}",
                 )
             branches.append(
                 self._branch(
